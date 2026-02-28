@@ -46,6 +46,29 @@ Conversion from source formats to Markdown is handled by [docling](https://githu
 - Metadata search and filtering
 - Multi-tenancy
 
+## Quick Start
+
+Run DocFabric with Docker using the pre-built images from GitHub Container Registry:
+
+```bash
+curl -O https://raw.githubusercontent.com/rawe/docfabric/main/examples/docker-compose/docker-compose.yml
+docker compose up -d
+```
+
+That's it. The services are available at:
+
+- **UI** — http://localhost:3000
+- **REST API** — http://localhost:8000/api
+- **MCP Server** — http://localhost:8000/mcp
+
+To pin a specific version instead of `latest`:
+
+```bash
+VERSION=0.1.0 docker compose up -d
+```
+
+See [docs/releasing.md](docs/releasing.md) for more deployment options including building from source.
+
 ## Documentation
 
 See [docs/index.md](docs/index.md) for the full documentation index, including PRD, architecture, API contracts, and setup instructions.

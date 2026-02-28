@@ -1,0 +1,27 @@
+services:
+  backend:
+    build: ../backend
+    container_name: docfabric-server
+    ports:
+      - "8000:8000"
+    environment:
+      # Four slashes: sqlite+aiosqlite:// + absolute path /app/data/docfabric.db
+      DATABASE_URL: sqlite+aiosqlite:////app/data/docfabric.db
+      # Store uploaded files inside the persistent volume
+      STORAGE_PATH: /app/data/storage
+    volumes:
+      - docfabric-data:/app/data
+
+  frontend:
+    build: ../frontend
+    container_name: docfabric-ui
+    ports:
+      - "3000:80"
+    environment:
+      # nginx proxies /api requests to this URL; uses the compose service name
+      API_URL: http://backend:8000
+    depends_on:
+      - backend
+
+volumes:
+  docfabric-data:
