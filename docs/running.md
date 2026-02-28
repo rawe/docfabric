@@ -4,6 +4,7 @@
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) package manager
+- Node.js 18+ (for frontend)
 
 ## Install dependencies
 
@@ -26,6 +27,16 @@ The server exposes:
 | `GET /health` | Readiness probe |
 | `/api/...` | REST API (see [api-contracts.md](api-contracts.md)) |
 | `POST /mcp` | MCP server (Streamable HTTP) |
+
+## Start the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Opens at `http://localhost:5173`. The Vite dev server proxies `/api` requests to the backend.
 
 ## Configuration
 
