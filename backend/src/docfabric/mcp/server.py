@@ -42,7 +42,7 @@ def create_mcp_server(get_service: Callable[[], DocumentService]) -> FastMCP:
         document_id: str,
         offset: int | None = None,
         limit: int | None = None,
-    ) -> dict:
+    ) -> str:
         """Read the markdown content of a document.
 
         Args:
@@ -53,6 +53,12 @@ def create_mcp_server(get_service: Callable[[], DocumentService]) -> FastMCP:
         result = await get_service().get_content(
             UUID(document_id), offset=offset, limit=limit
         )
-        return result.model_dump(mode="json")
+        text = result.content
+        if result.length < result.total_length:
+            text += (
+                f"\n\n---\n[offset={result.offset} length={result.length}"
+                f" total={result.total_length}]"
+            )
+        return text
 
     return mcp

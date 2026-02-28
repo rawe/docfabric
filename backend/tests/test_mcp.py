@@ -133,22 +133,31 @@ class TestReadDocumentContent:
         result = await mcp_client.call_tool(
             "read_document_content", {"document_id": doc_id}
         )
-        data = _parse_tool_result(result)
-        assert data["content"] == "# Converted markdown"
-        assert data["total_length"] == 20
-        assert data["offset"] == 0
-        assert data["length"] == 20
+        text = result.content[0].text
+        assert text == "# Converted markdown"
 
-    async def test_with_offset_and_limit(self, mcp_client: Client, service):
+    async def test_partial_content_includes_metadata_footer(
+        self, mcp_client: Client, service
+    ):
         doc_id = await _create_doc(service)
         result = await mcp_client.call_tool(
             "read_document_content",
             {"document_id": doc_id, "offset": 2, "limit": 5},
         )
-        data = _parse_tool_result(result)
-        assert data["content"] == "Conve"
-        assert data["offset"] == 2
-        assert data["length"] == 5
+        text = result.content[0].text
+        assert text.startswith("Conve")
+        assert "[offset=2 length=5 total=20]" in text
+
+    async def test_full_content_has_no_metadata_footer(
+        self, mcp_client: Client, service
+    ):
+        doc_id = await _create_doc(service)
+        result = await mcp_client.call_tool(
+            "read_document_content", {"document_id": doc_id}
+        )
+        text = result.content[0].text
+        assert "---" not in text
+        assert "[offset=" not in text
 
     async def test_not_found(self, mcp_client: Client):
         with pytest.raises(ToolError, match="not found"):
