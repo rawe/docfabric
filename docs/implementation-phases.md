@@ -2,7 +2,7 @@
 
 Three phases from zero to Phase 1 MVP.
 
-## Phase A — Foundation
+## Phase A — Foundation ✅
 
 Build the core layers without any HTTP interface.
 
@@ -10,10 +10,10 @@ Build the core layers without any HTTP interface.
 - Configuration (pydantic-settings, .env)
 - Database layer (SQLAlchemy Core async, documents table, repository)
 - File storage (local disk, originals + markdown)
-- Docling converter wrapper
-- Document service orchestrating all above
-- Pydantic models
-- Unit tests
+- Docling converter wrapper (`MarkdownConverter`)
+- Document service orchestrating all above (`DocumentNotFoundError` for error signaling)
+- Pydantic models (`DocumentMetadata`, `DocumentList`, `DocumentContent`)
+- 32 unit tests (models, config, repository, storage, converter, service)
 
 **Outcome:** Full document lifecycle (create, read, list, update, delete) works programmatically. No server needed.
 
