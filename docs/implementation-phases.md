@@ -35,7 +35,7 @@ Expose the document service over HTTP.
 Add read-only LLM access.
 
 - Dependency added: `fastmcp`
-- `create_mcp_server()` factory in `docfabric.mcp.server` with 3 tools (list, get, read content)
+- `create_mcp_server()` factory in `docfabric.mcp.server` with 3 tools (list_documents, get_document_info, read_document_content)
 - Tools delegate to existing `DocumentService` via lazy accessor
 - MCP HTTP app mounted at `/mcp` with combined lifespan in `main.py`
 - 9 integration tests via `fastmcp.Client` in-process transport (61 total)

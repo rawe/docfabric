@@ -111,13 +111,13 @@ Read-only access. Three tools:
 - **Parameters:**
   - `limit` (int, optional, default 20)
   - `offset` (int, optional, default 0)
-- **Returns:** Paginated document list (same shape as REST)
+- **Returns:** Paginated list with slim items (`id`, `filename` only), plus `total`, `limit`, `offset`
 
-### Tool: `get_document`
+### Tool: `get_document_info`
 
 - **Parameters:**
   - `document_id` (str, required)
-- **Returns:** Document metadata object
+- **Returns:** Full document metadata object (JSON)
 
 ### Tool: `read_document_content`
 
@@ -125,7 +125,7 @@ Read-only access. Three tools:
   - `document_id` (str, required)
   - `offset` (int, optional) — character offset
   - `limit` (int, optional) — character count
-- **Returns:** Markdown content with total length info
+- **Returns:** Plain text markdown content. When paginated, includes a compact metadata footer
 
 ---
 

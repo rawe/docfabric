@@ -73,7 +73,7 @@ class TestListTools:
     async def test_three_tools_registered(self, mcp_client: Client):
         tools = await mcp_client.list_tools()
         names = {t.name for t in tools}
-        assert names == {"list_documents", "read_document_content"}
+        assert names == {"list_documents", "get_document_info", "read_document_content"}
 
 
 class TestListDocuments:
@@ -90,6 +90,16 @@ class TestListDocuments:
         data = _parse_tool_result(result)
         assert data["total"] == 2
         assert len(data["items"]) == 2
+
+    async def test_items_only_have_id_and_filename(
+        self, mcp_client: Client, service
+    ):
+        await _create_doc(service, "a.pdf")
+        result = await mcp_client.call_tool("list_documents", {})
+        data = _parse_tool_result(result)
+        item = data["items"][0]
+        assert set(item.keys()) == {"id", "filename"}
+        assert item["filename"] == "a.pdf"
 
     async def test_pagination(self, mcp_client: Client, service):
         await _create_doc(service, "a.pdf")
@@ -108,6 +118,27 @@ class TestListDocuments:
         )
         data = _parse_tool_result(result)
         assert len(data["items"]) == 1
+
+
+class TestGetDocumentInfo:
+    async def test_found(self, mcp_client: Client, service):
+        doc_id = await _create_doc(service)
+        result = await mcp_client.call_tool(
+            "get_document_info", {"document_id": doc_id}
+        )
+        data = _parse_tool_result(result)
+        assert data["id"] == doc_id
+        assert data["filename"] == "test.pdf"
+        assert data["content_type"] == "application/pdf"
+        assert data["size_bytes"] == 9
+        assert "created_at" in data
+        assert "updated_at" in data
+
+    async def test_not_found(self, mcp_client: Client):
+        with pytest.raises(ToolError, match="not found"):
+            await mcp_client.call_tool(
+                "get_document_info", {"document_id": str(uuid4())}
+            )
 
 
 class TestReadDocumentContent:

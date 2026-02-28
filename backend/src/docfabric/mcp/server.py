@@ -25,6 +25,24 @@ def create_mcp_server(get_service: Callable[[], DocumentService]) -> FastMCP:
             offset: Number of documents to skip (default 0).
         """
         result = await get_service().list(limit=limit, offset=offset)
+        return {
+            "items": [
+                {"id": str(item.id), "filename": item.filename}
+                for item in result.items
+            ],
+            "total": result.total,
+            "limit": result.limit,
+            "offset": result.offset,
+        }
+
+    @mcp.tool()
+    async def get_document_info(document_id: str) -> dict:
+        """Get full metadata for a single document.
+
+        Args:
+            document_id: UUID of the document.
+        """
+        result = await get_service().get(UUID(document_id))
         return result.model_dump(mode="json")
 
     @mcp.tool()
