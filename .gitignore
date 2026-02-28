@@ -12,6 +12,9 @@ __pycache__/
 # Environment
 .env
 
+# Bug investigation notes
+.bugs/
+
 # DocFabric
 storage/
 *.db
