@@ -9,6 +9,9 @@ dependencies = [
     "pydantic>=2",
     "pydantic-settings",
     "docling",
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
 ]
 
 [dependency-groups]
@@ -16,6 +19,7 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "ruff",
+    "httpx",
 ]
 
 [build-system]

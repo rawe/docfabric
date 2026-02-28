@@ -17,14 +17,16 @@ Build the core layers without any HTTP interface.
 
 **Outcome:** Full document lifecycle (create, read, list, update, delete) works programmatically. No server needed.
 
-## Phase B — REST API
+## Phase B — REST API ✅
 
 Expose the document service over HTTP.
 
-- FastAPI app with dependency injection
-- All REST endpoints per [api-contracts.md](api-contracts.md)
-- Health endpoint, CORS
-- Integration tests via TestClient
+- Dependencies added: `fastapi`, `uvicorn[standard]`, `python-multipart`, `httpx` (dev)
+- App factory with lifespan context manager (`create_app()`)
+- CORS middleware, `DocumentNotFoundError` → 404 exception handler
+- Health endpoint at `/health`, all REST endpoints under `/api` per [api-contracts.md](api-contracts.md)
+- API router: thin HTTP-to-service wiring, no new business logic
+- 20 integration tests via `httpx.AsyncClient` + `ASGITransport` (52 total)
 
 **Outcome:** System is usable via curl/Postman. Full CRUD over HTTP.
 
