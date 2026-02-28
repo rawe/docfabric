@@ -73,7 +73,7 @@ class TestListTools:
     async def test_three_tools_registered(self, mcp_client: Client):
         tools = await mcp_client.list_tools()
         names = {t.name for t in tools}
-        assert names == {"list_documents", "get_document", "read_document_content"}
+        assert names == {"list_documents", "read_document_content"}
 
 
 class TestListDocuments:
@@ -108,23 +108,6 @@ class TestListDocuments:
         )
         data = _parse_tool_result(result)
         assert len(data["items"]) == 1
-
-
-class TestGetDocument:
-    async def test_found(self, mcp_client: Client, service):
-        doc_id = await _create_doc(service)
-        result = await mcp_client.call_tool(
-            "get_document", {"document_id": doc_id}
-        )
-        data = _parse_tool_result(result)
-        assert data["id"] == doc_id
-        assert data["filename"] == "test.pdf"
-
-    async def test_not_found(self, mcp_client: Client):
-        with pytest.raises(ToolError, match="not found"):
-            await mcp_client.call_tool(
-                "get_document", {"document_id": str(uuid4())}
-            )
 
 
 class TestReadDocumentContent:

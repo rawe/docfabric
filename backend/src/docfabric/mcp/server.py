@@ -28,16 +28,6 @@ def create_mcp_server(get_service: Callable[[], DocumentService]) -> FastMCP:
         return result.model_dump(mode="json")
 
     @mcp.tool()
-    async def get_document(document_id: str) -> dict:
-        """Get document metadata by ID.
-
-        Args:
-            document_id: UUID of the document.
-        """
-        result = await get_service().get(UUID(document_id))
-        return result.model_dump(mode="json")
-
-    @mcp.tool()
     async def read_document_content(
         document_id: str,
         offset: int | None = None,
