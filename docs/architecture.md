@@ -13,7 +13,7 @@ DocFabric runs as a **single Python process** exposing two interfaces:
 │                                     │
 │  ┌─────────────┐  ┌──────────────┐  │
 │  │  REST API   │  │  MCP Server  │  │
-│  │  /api/v1/*  │  │  /mcp        │  │
+│  │  /api/*     │  │  /mcp        │  │
 │  └──────┬──────┘  └──────┬───────┘  │
 │         │                │          │
 │         ▼                ▼          │
@@ -42,11 +42,19 @@ DocFabric runs as a **single Python process** exposing two interfaces:
 | Web framework | FastAPI | Async, Pydantic integration, mature |
 | MCP framework | FastMCP | Mounts into FastAPI, decorator-based tools |
 | MCP transport | Streamable HTTP | Default FastMCP transport |
-| Markdown conversion | docling | Multi-format support (PDF, DOCX, PPTX, HTML, etc.) |
+| Markdown conversion | docling | Multi-format support, high-quality PDF/table extraction |
+| Accepted formats | PDF, DOCX, PPTX, HTML, CSV, Images | No EPUB in Phase 1 |
+| Conversion mode | CPU-only | GPU support deferred; simpler deployment |
+| Conversion concurrency | Synchronous (blocking) | Async processing is a future concern |
 | Database | SQLite (Phase 1) | Zero-config, file-based, sufficient for MVP |
 | DB access | SQLAlchemy Core (async) + aiosqlite | Dialect abstraction enables future DB swap without rewriting queries |
 | File storage | Local filesystem | Simple, sufficient for Phase 1 |
 | ID generation | UUID v4 | No coordination needed, globally unique |
+| Configuration | Env vars + .env file | pydantic-settings, 12-factor compliant |
+| API prefix | `/api` (no versioning) | Separates REST (`/api/*`) from MCP (`/mcp`) at root level |
+| CORS | Enabled, permissive defaults | Allows browser-based clients; tighten for production |
+| Logging | Plain text | Readable during dev; switch to structured JSON for production later |
+| Testing | Unit + integration | In-memory SQLite + temp dirs for unit; TestClient for integration |
 
 ## Component Responsibilities
 
@@ -121,3 +129,9 @@ SQLAlchemy Core provides the abstraction layer:
 - Swapping DB = changing the connection string + adding the async driver package
 - No ABC/Protocol wrapper — YAGNI until a second implementation exists
 - Alembic available for future schema migrations
+
+## Operational Decisions
+
+- **Health endpoint:** `GET /health` returns 200 OK for readiness probes
+- **Docling footprint:** ~1-2 GB install (PyTorch + ML models) accepted for Phase 1
+- **Future:** Async document conversion (queue-based) planned for scaling beyond MVP

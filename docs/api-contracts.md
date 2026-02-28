@@ -2,9 +2,18 @@
 
 ## REST API
 
-Base path: `/api/v1`
+Base path: `/api`
 
-### POST /documents
+### GET /health
+
+Readiness probe.
+
+- **Response:** `200 OK`
+  ```json
+  { "status": "ok" }
+  ```
+
+### POST /api/documents
 
 Upload a new document.
 
@@ -25,7 +34,7 @@ Upload a new document.
   ```
 - **Behavior:** Stores original file, generates markdown via docling, persists both.
 
-### PUT /documents/{id}
+### PUT /api/documents/{id}
 
 Replace document file entirely.
 
@@ -34,14 +43,14 @@ Replace document file entirely.
 - **Response:** `200 OK` — updated document metadata
 - **Behavior:** Replaces original file, regenerates markdown, updates `updated_at`.
 
-### DELETE /documents/{id}
+### DELETE /api/documents/{id}
 
 Remove document completely.
 
 - **Response:** `204 No Content`
 - **Behavior:** Deletes DB record, original file, and markdown.
 
-### GET /documents
+### GET /api/documents
 
 List all documents.
 
@@ -59,19 +68,19 @@ List all documents.
   ```
 - **Sort:** `created_at DESC` (fixed)
 
-### GET /documents/{id}
+### GET /api/documents/{id}
 
 Get document metadata.
 
 - **Response:** `200 OK` — document metadata object (no content)
 
-### GET /documents/{id}/original
+### GET /api/documents/{id}/original
 
 Download original file.
 
 - **Response:** `200 OK` — file stream with original `Content-Type`
 
-### GET /documents/{id}/content
+### GET /api/documents/{id}/content
 
 Read markdown representation.
 
