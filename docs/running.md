@@ -55,7 +55,7 @@ Add a `.mcp.json` to your project root (see [`docs/mcp-example.json`](mcp-exampl
 {
   "mcpServers": {
     "docfabric": {
-      "type": "url",
+      "type": "http",
       "url": "http://localhost:8000/mcp/"
     }
   }
