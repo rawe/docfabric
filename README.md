@@ -46,7 +46,9 @@ Conversion from source formats to Markdown is handled by [docling](https://githu
 - Metadata search and filtering
 - Multi-tenancy
 
-## Quick Start
+## Getting Started
+
+### Pre-built images (recommended)
 
 Run DocFabric with Docker using the pre-built images from GitHub Container Registry:
 
@@ -55,19 +57,43 @@ curl -O https://raw.githubusercontent.com/rawe/docfabric/main/examples/docker-co
 docker compose up -d
 ```
 
-That's it. The services are available at:
-
-- **UI** — http://localhost:3000
-- **REST API** — http://localhost:8000/api
-- **MCP Server** — http://localhost:8000/mcp
-
 To pin a specific version instead of `latest`:
 
 ```bash
 VERSION=0.1.0 docker compose up -d
 ```
 
-See [docs/releasing.md](docs/releasing.md) for more deployment options including building from source.
+### Docker from source
+
+Build and run from a cloned repository:
+
+```bash
+cd docker
+docker compose up -d --build
+```
+
+### Development mode
+
+Requires [uv](https://docs.astral.sh/uv/) and Node.js:
+
+```bash
+cd backend && uv sync      # install Python dependencies
+cd ../frontend && npm ci    # install Node dependencies
+cd ..
+./dev.sh                    # starts backend + frontend with hot-reload
+```
+
+### Services
+
+All three options expose the same endpoints:
+
+| Service | Pre-built / Docker | Development |
+|---------|--------------------|-------------|
+| **UI** | http://localhost:3000 | http://localhost:5173 |
+| **REST API** | http://localhost:8000/api | http://localhost:8000/api |
+| **MCP Server** | http://localhost:8000/mcp | http://localhost:8000/mcp |
+
+See [docs/releasing.md](docs/releasing.md) for Makefile targets, CI workflow, and configuration reference.
 
 ## Documentation
 
