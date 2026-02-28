@@ -84,25 +84,28 @@ storage/
 ## Project Structure
 
 ```
-src/docfabric/
-    main.py              # App factory, lifespan, mount MCP
-    config.py            # Settings (DB URL, storage path)
-    api/
-        router.py        # REST endpoints
-    mcp/
-        server.py        # FastMCP tools
-    service/
-        document.py      # Business logic
-    db/
-        engine.py        # AsyncEngine factory
-        tables.py        # Table definitions
-        repository.py    # DocumentRepository
-    conversion/
-        converter.py     # docling wrapper
-    models/
-        document.py      # Pydantic models (API schemas)
-tests/
-    ...
+backend/
+    src/docfabric/
+        main.py              # App factory, lifespan, mount MCP
+        config.py            # Settings (DB URL, storage path)
+        api/
+            router.py        # REST endpoints
+        mcp/
+            server.py        # FastMCP tools
+        service/
+            document.py      # Business logic
+        db/
+            engine.py        # AsyncEngine factory
+            tables.py        # Table definitions
+            repository.py    # DocumentRepository
+        conversion/
+            converter.py     # docling wrapper
+        models/
+            document.py      # Pydantic models (API schemas)
+    tests/
+        ...
+frontend/                    # React UI (planned)
+docs/
 ```
 
 ## Data Model
