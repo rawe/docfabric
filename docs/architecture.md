@@ -62,7 +62,7 @@ DocFabric runs as a **single Python process** exposing two interfaces:
 Handles HTTP requests, input validation (Pydantic), file uploads. Delegates to Document Service. See [api-contracts.md](api-contracts.md).
 
 ### MCP Server
-Read-only tools for LLM access: list documents, get document info, read content. Mounted at `/mcp` inside FastAPI via `app.mount()`. See [api-contracts.md](api-contracts.md).
+Read-only tools for LLM access: list documents, get document info, get document outline, read content. Mounted at `/mcp` inside FastAPI via `app.mount()`. See [api-contracts.md](api-contracts.md).
 
 ### Document Service
 Core business logic. Orchestrates:

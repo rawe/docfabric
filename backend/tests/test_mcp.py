@@ -1,6 +1,6 @@
 import json
 from unittest.mock import MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastmcp import Client
@@ -69,11 +69,25 @@ async def _create_doc(service: DocumentService, filename="test.pdf") -> str:
     return str(doc.id)
 
 
+async def _create_doc_with_markdown(
+    service: DocumentService, markdown: str, filename="test.pdf"
+) -> str:
+    """Create a doc and overwrite its markdown content directly."""
+    doc_id = await _create_doc(service, filename)
+    service._storage.save_markdown(UUID(doc_id), markdown)
+    return doc_id
+
+
 class TestListTools:
     async def test_three_tools_registered(self, mcp_client: Client):
         tools = await mcp_client.list_tools()
         names = {t.name for t in tools}
-        assert names == {"list_documents", "get_document_info", "read_document_content"}
+        assert names == {
+            "list_documents",
+            "get_document_info",
+            "read_document_content",
+            "get_document_outline",
+        }
 
 
 class TestListDocuments:
@@ -177,4 +191,110 @@ class TestReadDocumentContent:
         with pytest.raises(ToolError, match="not found"):
             await mcp_client.call_tool(
                 "read_document_content", {"document_id": str(uuid4())}
+            )
+
+
+_OUTLINE_MD = """\
+# Introduction
+Intro text.
+## Background
+Background text.
+### Details
+Detail text.
+## Methods
+Methods text."""
+
+
+class TestGetDocumentOutline:
+    async def test_returns_sections_with_offset_and_length(
+        self, mcp_client: Client, service
+    ):
+        doc_id = await _create_doc_with_markdown(service, _OUTLINE_MD)
+        result = await mcp_client.call_tool(
+            "get_document_outline", {"document_id": doc_id}
+        )
+        data = _parse_tool_result(result)
+        sections = data["sections"]
+        assert len(sections) == 4
+        assert data["total_length"] == len(_OUTLINE_MD)
+
+        # Check field names
+        for s in sections:
+            assert set(s.keys()) == {"level", "title", "offset", "length"}
+
+        # Check titles and levels in order
+        assert sections[0]["title"] == "Introduction"
+        assert sections[0]["level"] == 1
+        assert sections[1]["title"] == "Background"
+        assert sections[1]["level"] == 2
+        assert sections[2]["title"] == "Details"
+        assert sections[2]["level"] == 3
+        assert sections[3]["title"] == "Methods"
+        assert sections[3]["level"] == 2
+
+    async def test_h1_spans_entire_document(
+        self, mcp_client: Client, service
+    ):
+        doc_id = await _create_doc_with_markdown(service, _OUTLINE_MD)
+        result = await mcp_client.call_tool(
+            "get_document_outline", {"document_id": doc_id}
+        )
+        data = _parse_tool_result(result)
+        h1 = data["sections"][0]
+        assert h1["offset"] == 0
+        assert h1["length"] == len(_OUTLINE_MD)
+
+    async def test_h2_includes_its_subheadings(
+        self, mcp_client: Client, service
+    ):
+        doc_id = await _create_doc_with_markdown(service, _OUTLINE_MD)
+        result = await mcp_client.call_tool(
+            "get_document_outline", {"document_id": doc_id}
+        )
+        data = _parse_tool_result(result)
+        bg = data["sections"][1]  # Background (H2)
+        details = data["sections"][2]  # Details (H3)
+        methods = data["sections"][3]  # Methods (H2)
+
+        # Background section includes Details subsection
+        assert bg["offset"] + bg["length"] == methods["offset"]
+        # Details is contained within Background
+        assert details["offset"] >= bg["offset"]
+        assert details["offset"] + details["length"] <= bg["offset"] + bg["length"]
+
+    async def test_offset_length_usable_with_read_tool(
+        self, mcp_client: Client, service
+    ):
+        doc_id = await _create_doc_with_markdown(service, _OUTLINE_MD)
+        outline = _parse_tool_result(
+            await mcp_client.call_tool(
+                "get_document_outline", {"document_id": doc_id}
+            )
+        )
+        methods = outline["sections"][3]
+        content = await mcp_client.call_tool(
+            "read_document_content",
+            {
+                "document_id": doc_id,
+                "offset": methods["offset"],
+                "limit": methods["length"],
+            },
+        )
+        text = content.content[0].text
+        assert text.startswith("## Methods")
+        assert "Methods text." in text
+
+    async def test_no_headings(self, mcp_client: Client, service):
+        doc_id = await _create_doc_with_markdown(service, "Just plain text.")
+        result = await mcp_client.call_tool(
+            "get_document_outline", {"document_id": doc_id}
+        )
+        data = _parse_tool_result(result)
+        assert data["sections"] == []
+        assert data["total_length"] == 16
+
+    async def test_not_found(self, mcp_client: Client):
+        with pytest.raises(ToolError, match="not found"):
+            await mcp_client.call_tool(
+                "get_document_outline", {"document_id": str(uuid4())}
             )

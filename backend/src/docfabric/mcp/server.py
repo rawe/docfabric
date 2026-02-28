@@ -1,9 +1,12 @@
+import re
 from collections.abc import Callable
 from uuid import UUID
 
 from mcp.server.fastmcp import FastMCP
 
 from docfabric.service.document import DocumentService
+
+_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 
 
 def create_mcp_server(get_service: Callable[[], DocumentService]) -> FastMCP:
@@ -68,5 +71,40 @@ def create_mcp_server(get_service: Callable[[], DocumentService]) -> FastMCP:
                 f" total={result.total_length}]"
             )
         return text
+
+    @mcp.tool()
+    async def get_document_outline(document_id: str) -> dict:
+        """Get the heading outline of a document.
+
+        Returns all headings with their offset and length so that
+        read_document_content can be called directly with those values
+        to retrieve a specific section. Each section's length includes
+        its sub-headings.
+
+        Args:
+            document_id: UUID of the document.
+        """
+        result = await get_service().get_content(UUID(document_id))
+        text = result.content
+        total = result.total_length
+
+        headings = [
+            (m.start(), len(m.group(1)), m.group(2).strip())
+            for m in _HEADING_RE.finditer(text)
+        ]
+
+        sections = []
+        for i, (start, level, title) in enumerate(headings):
+            # Find end: next heading at same or higher level
+            end = total
+            for future_start, future_level, _ in headings[i + 1 :]:
+                if future_level <= level:
+                    end = future_start
+                    break
+            sections.append(
+                {"level": level, "title": title, "offset": start, "length": end - start}
+            )
+
+        return {"sections": sections, "total_length": total}
 
     return mcp

@@ -104,7 +104,7 @@ Read markdown representation.
 
 Mount path: `/mcp`
 
-Read-only access. Three tools:
+Read-only access. Four tools:
 
 ### Tool: `list_documents`
 
@@ -118,6 +118,13 @@ Read-only access. Three tools:
 - **Parameters:**
   - `document_id` (str, required)
 - **Returns:** Full document metadata object (JSON)
+
+### Tool: `get_document_outline`
+
+- **Parameters:**
+  - `document_id` (str, required)
+- **Returns:** Flat list of heading sections with `level`, `title`, `offset`, `length`. Each section's `length` includes its sub-headings. The `offset` and `length` values map directly to `read_document_content` parameters, enabling precise section retrieval without reading the entire document.
+- **Rationale:** Lets an LLM navigate large documents structurally — scan headings first, then read only the relevant section. Implemented entirely in the MCP layer by parsing stored markdown; no new service methods or models.
 
 ### Tool: `read_document_content`
 
