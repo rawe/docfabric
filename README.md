@@ -6,4 +6,4 @@ DocFabric standardizes access to heterogeneous document sources and provides a c
 
 ## Documentation
 
-- [Product Requirements Document](docs/prd.md)
+- [Documentation Index](docs/index.md)
