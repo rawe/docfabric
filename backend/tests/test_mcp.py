@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
@@ -11,6 +12,11 @@ from docfabric.db.repository import DocumentRepository
 from docfabric.mcp.server import create_mcp_server
 from docfabric.service.document import DocumentService
 from docfabric.storage import FileStorage
+
+
+def _parse_tool_result(result) -> dict:
+    """Extract parsed JSON data from an MCP tool call result."""
+    return json.loads(result.content[0].text)
 
 
 @pytest.fixture
@@ -73,15 +79,17 @@ class TestListTools:
 class TestListDocuments:
     async def test_empty(self, mcp_client: Client):
         result = await mcp_client.call_tool("list_documents", {})
-        assert result.data["items"] == []
-        assert result.data["total"] == 0
+        data = _parse_tool_result(result)
+        assert data["items"] == []
+        assert data["total"] == 0
 
     async def test_with_documents(self, mcp_client: Client, service):
         await _create_doc(service, "a.pdf")
         await _create_doc(service, "b.pdf")
         result = await mcp_client.call_tool("list_documents", {})
-        assert result.data["total"] == 2
-        assert len(result.data["items"]) == 2
+        data = _parse_tool_result(result)
+        assert data["total"] == 2
+        assert len(data["items"]) == 2
 
     async def test_pagination(self, mcp_client: Client, service):
         await _create_doc(service, "a.pdf")
@@ -91,13 +99,15 @@ class TestListDocuments:
         result = await mcp_client.call_tool(
             "list_documents", {"limit": 2, "offset": 0}
         )
-        assert len(result.data["items"]) == 2
-        assert result.data["total"] == 3
+        data = _parse_tool_result(result)
+        assert len(data["items"]) == 2
+        assert data["total"] == 3
 
         result = await mcp_client.call_tool(
             "list_documents", {"limit": 2, "offset": 2}
         )
-        assert len(result.data["items"]) == 1
+        data = _parse_tool_result(result)
+        assert len(data["items"]) == 1
 
 
 class TestGetDocument:
@@ -106,8 +116,9 @@ class TestGetDocument:
         result = await mcp_client.call_tool(
             "get_document", {"document_id": doc_id}
         )
-        assert result.data["id"] == doc_id
-        assert result.data["filename"] == "test.pdf"
+        data = _parse_tool_result(result)
+        assert data["id"] == doc_id
+        assert data["filename"] == "test.pdf"
 
     async def test_not_found(self, mcp_client: Client):
         with pytest.raises(ToolError, match="not found"):
@@ -122,10 +133,11 @@ class TestReadDocumentContent:
         result = await mcp_client.call_tool(
             "read_document_content", {"document_id": doc_id}
         )
-        assert result.data["content"] == "# Converted markdown"
-        assert result.data["total_length"] == 20
-        assert result.data["offset"] == 0
-        assert result.data["length"] == 20
+        data = _parse_tool_result(result)
+        assert data["content"] == "# Converted markdown"
+        assert data["total_length"] == 20
+        assert data["offset"] == 0
+        assert data["length"] == 20
 
     async def test_with_offset_and_limit(self, mcp_client: Client, service):
         doc_id = await _create_doc(service)
@@ -133,9 +145,10 @@ class TestReadDocumentContent:
             "read_document_content",
             {"document_id": doc_id, "offset": 2, "limit": 5},
         )
-        assert result.data["content"] == "Conve"
-        assert result.data["offset"] == 2
-        assert result.data["length"] == 5
+        data = _parse_tool_result(result)
+        assert data["content"] == "Conve"
+        assert data["offset"] == 2
+        assert data["length"] == 5
 
     async def test_not_found(self, mcp_client: Client):
         with pytest.raises(ToolError, match="not found"):

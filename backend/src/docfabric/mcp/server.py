@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from uuid import UUID
 
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 
 from docfabric.service.document import DocumentService
 
@@ -13,9 +13,10 @@ def create_mcp_server(get_service: Callable[[], DocumentService]) -> FastMCP:
         get_service: Callable returning the DocumentService instance.
                      Called at tool invocation time (not at creation time).
     """
-    mcp = FastMCP("DocFabric")
+    mcp = FastMCP("DocFabric", stateless_http=True, json_response=True)
+    mcp.settings.streamable_http_path = "/"
 
-    @mcp.tool
+    @mcp.tool()
     async def list_documents(limit: int = 20, offset: int = 0) -> dict:
         """List documents with pagination.
 
@@ -26,7 +27,7 @@ def create_mcp_server(get_service: Callable[[], DocumentService]) -> FastMCP:
         result = await get_service().list(limit=limit, offset=offset)
         return result.model_dump(mode="json")
 
-    @mcp.tool
+    @mcp.tool()
     async def get_document(document_id: str) -> dict:
         """Get document metadata by ID.
 
@@ -36,7 +37,7 @@ def create_mcp_server(get_service: Callable[[], DocumentService]) -> FastMCP:
         result = await get_service().get(UUID(document_id))
         return result.model_dump(mode="json")
 
-    @mcp.tool
+    @mcp.tool()
     async def read_document_content(
         document_id: str,
         offset: int | None = None,

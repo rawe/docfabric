@@ -26,7 +26,7 @@ The server exposes:
 |----------|-------------|
 | `GET /health` | Readiness probe |
 | `/api/...` | REST API (see [api-contracts.md](api-contracts.md)) |
-| `POST /mcp` | MCP server (Streamable HTTP) |
+| `POST /mcp/` | MCP server (Streamable HTTP) |
 
 ## Start the frontend
 
@@ -56,7 +56,7 @@ Add a `.mcp.json` to your project root (see [`docs/mcp-example.json`](mcp-exampl
   "mcpServers": {
     "docfabric": {
       "type": "url",
-      "url": "http://localhost:8000/mcp"
+      "url": "http://localhost:8000/mcp/"
     }
   }
 }

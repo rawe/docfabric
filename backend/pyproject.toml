@@ -12,7 +12,7 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "python-multipart",
-    "fastmcp",
+    "mcp[cli]>=1.9",
 ]
 
 [dependency-groups]
@@ -21,6 +21,7 @@ dev = [
     "pytest-asyncio",
     "ruff",
     "httpx",
+    "fastmcp",
 ]
 
 [build-system]
