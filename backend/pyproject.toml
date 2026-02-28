@@ -12,6 +12,7 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "python-multipart",
+    "fastmcp",
 ]
 
 [dependency-groups]

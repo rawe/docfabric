@@ -30,13 +30,15 @@ Expose the document service over HTTP.
 
 **Outcome:** System is usable via curl/Postman. Full CRUD over HTTP.
 
-## Phase C — MCP Server
+## Phase C — MCP Server ✅
 
 Add read-only LLM access.
 
-- FastMCP with 3 tools (list, get, read content)
-- Mounted into the FastAPI app at `/mcp`
-- Integration tests
+- Dependency added: `fastmcp`
+- `create_mcp_server()` factory in `docfabric.mcp.server` with 3 tools (list, get, read content)
+- Tools delegate to existing `DocumentService` via lazy accessor
+- MCP HTTP app mounted at `/mcp` with combined lifespan in `main.py`
+- 9 integration tests via `fastmcp.Client` in-process transport (61 total)
 
 **Outcome:** Phase 1 MVP complete. REST + MCP running in one process.
 

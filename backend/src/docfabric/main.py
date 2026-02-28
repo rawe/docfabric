@@ -9,12 +9,16 @@ from docfabric.config import Settings
 from docfabric.conversion.converter import MarkdownConverter
 from docfabric.db.engine import create_engine, init_db
 from docfabric.db.repository import DocumentRepository
+from docfabric.mcp.server import create_mcp_server
 from docfabric.service.document import DocumentNotFoundError, DocumentService
 from docfabric.storage import FileStorage
 
 
 def create_app() -> FastAPI:
     settings = Settings()
+
+    mcp = create_mcp_server(lambda: app.state.document_service)
+    mcp_app = mcp.http_app(path="/")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -26,7 +30,8 @@ def create_app() -> FastAPI:
         app.state.document_service = DocumentService(
             repository=repository, storage=storage, converter=converter
         )
-        yield
+        async with mcp_app.router.lifespan_context(app):
+            yield
         await engine.dispose()
 
     app = FastAPI(lifespan=lifespan)
@@ -50,6 +55,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(router, prefix="/api")
+    app.mount("/mcp", mcp_app)
 
     return app
 
