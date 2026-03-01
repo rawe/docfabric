@@ -1,6 +1,6 @@
 ---
 name: docfabric
-description: "Upload and manage documents in DocFabric. Use when the user wants to ingest files for AI-optimized access."
+description: "Manage documents in DocFabric. Use when the user wants to upload or delete documents."
 ---
 
 # Goal
@@ -24,3 +24,18 @@ uv run scripts/upload.py <file> [--metadata KEY=VALUE ...]
 **Output**: `<filename>: <document-id>`
 
 The returned document ID identifies the document for subsequent MCP operations.
+
+## Delete
+
+Delete a document from DocFabric.
+
+**Script**: `scripts/delete.py`
+
+```bash
+uv run scripts/delete.py <document-id>
+```
+
+**Parameters**:
+- `document-id` (required) — UUID of the document to delete
+
+**Output**: `<document-id>: deleted`
