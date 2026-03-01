@@ -1,0 +1,14 @@
+{
+  "name": "docfabric-marketplace",
+  "owner": {
+    "name": "rawe"
+  },
+  "plugins": [
+    {
+      "name": "docfabric",
+      "source": "./plugins/docfabric",
+      "description": "Upload and manage documents in DocFabric",
+      "version": "0.1.0"
+    }
+  ]
+}

@@ -95,6 +95,16 @@ All three options expose the same endpoints:
 
 See [docs/releasing.md](docs/releasing.md) for Makefile targets, CI workflow, and configuration reference.
 
+## Claude Code Plugin
+
+DocFabric ships a Claude Code plugin for document upload — the MCP server is read-only, so uploading requires the REST API. Install it from this repository's marketplace:
+
+```bash
+claude plugin install docfabric@docfabric-marketplace
+```
+
+This adds the `/docfabric:docfabric` skill, which lets Claude upload local files on your behalf.
+
 ## Documentation
 
 See [docs/index.md](docs/index.md) for the full documentation index, including PRD, architecture, API contracts, and setup instructions.
