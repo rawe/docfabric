@@ -1,54 +1,87 @@
 # Releasing
 
-DocFabric publishes two container images to the GitHub Container Registry (GHCR):
+## Overview
 
-| Image | Description |
-|-------|-------------|
-| `ghcr.io/rawe/docfabric-server` | FastAPI backend |
-| `ghcr.io/rawe/docfabric-ui` | React frontend served via nginx |
+DocFabric publishes two container images to GHCR via a GitHub Actions workflow (`.github/workflows/release-images.yml`). Images are built for both **linux/amd64** and **linux/arm64**.
 
-## Creating a Release
+| Image | Source | Description |
+|-------|--------|-------------|
+| `ghcr.io/rawe/docfabric-server` | `backend/` | FastAPI backend |
+| `ghcr.io/rawe/docfabric-ui` | `frontend/` | React frontend served via nginx |
 
-Tag the commit and push:
+## Component Versions
+
+Each component tracks its own version independently of the release tag:
+
+| Component | File | Field |
+|-----------|------|-------|
+| Server | `backend/pyproject.toml` | `version` |
+| UI | `frontend/package.json` | `version` |
+
+Component versions do not need to match the git tag, but **must be bumped before tagging** if the component has changed since the last release. The Makefile reads these versions and embeds them as OCI image labels (`COMPONENT_VERSION`).
+
+## Release Steps
+
+1. Bump component versions for any component that changed:
+
+   ```bash
+   # backend/pyproject.toml
+   version = "0.2.0"
+
+   # frontend/package.json
+   "version": "0.2.0"
+   ```
+
+2. Commit the version bumps.
+
+3. Tag and push:
+
+   ```bash
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+
+The CI workflow triggers on `v*` tag pushes. It builds both images with the tag version and `latest`, then pushes them to GHCR. The workflow can also be triggered manually from the Actions tab with a version string (without the `v` prefix).
+
+## Build Details
+
+The `Makefile` drives all builds. It reads component versions from `backend/pyproject.toml` and `frontend/package.json` and passes them as build args alongside the git commit hash and build date.
+
+| Build arg | Source |
+|-----------|--------|
+| `VERSION` | Release tag (passed explicitly) |
+| `COMPONENT_VERSION` | Component's own version from its manifest |
+| `GIT_COMMIT` | `git rev-parse --short HEAD` |
+| `BUILD_DATE` | UTC timestamp |
+
+CI builds use registry-based BuildKit cache (`--cache-from`/`--cache-to` with `mode=max`). Local builds skip caching and load directly into the Docker daemon.
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+# Local build (host architecture only)
+make release VERSION=0.2.0
+
+# CI build (multi-arch, pushes to GHCR)
+make release VERSION=0.2.0 PUSH=true
+
+# Single component
+make release-server VERSION=0.2.0
+make release-ui VERSION=0.2.0
 ```
-
-The `release-images` GitHub Actions workflow triggers on any `v*` tag push. It builds both images and pushes them to GHCR with the version tag and `latest`.
-
-Alternatively, trigger the workflow manually from the Actions tab with a version string (without the `v` prefix).
 
 ## Running with Docker Compose
 
-### Local build
-
-Build and run from source:
+### From source
 
 ```bash
 cd docker
 docker compose up -d --build
 ```
 
-- UI: http://localhost:3000
-- API: http://localhost:8000
-- MCP: http://localhost:8000/mcp
-
-Tear down:
-
-```bash
-cd docker
-docker compose down
-```
-
-### Pre-built images
-
-Use the example compose file to run from GHCR images:
+### From GHCR images
 
 ```bash
 cd examples/docker-compose
-VERSION=1.0.0 docker compose up -d
+VERSION=0.2.0 docker compose up -d
 ```
 
 Or use `latest`:
@@ -56,27 +89,6 @@ Or use `latest`:
 ```bash
 cd examples/docker-compose
 docker compose up -d
-```
-
-## Manual Image Build
-
-Build images locally without pushing:
-
-```bash
-make release VERSION=1.0.0
-```
-
-Build and push:
-
-```bash
-make release VERSION=1.0.0 PUSH=true
-```
-
-Build a single image:
-
-```bash
-make release-server VERSION=1.0.0
-make release-ui VERSION=1.0.0
 ```
 
 ## Configuration

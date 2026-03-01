@@ -61,6 +61,7 @@ release-server: _check-version
 		-t $(IMAGE_SERVER):$(VERSION) \
 		-t $(IMAGE_SERVER):latest \
 		-f backend/Dockerfile \
+		$(if $(PUSH),--platform linux/amd64$(comma)linux/arm64) \
 		$(if $(PUSH),--cache-from type=registry$(comma)ref=$(IMAGE_SERVER):buildcache) \
 		$(if $(PUSH),--cache-to type=registry$(comma)ref=$(IMAGE_SERVER):buildcache$(comma)mode=max) \
 		$(if $(PUSH),--push,--load) \
@@ -78,6 +79,7 @@ release-ui: _check-version
 		-t $(IMAGE_UI):$(VERSION) \
 		-t $(IMAGE_UI):latest \
 		-f frontend/Dockerfile \
+		$(if $(PUSH),--platform linux/amd64$(comma)linux/arm64) \
 		$(if $(PUSH),--cache-from type=registry$(comma)ref=$(IMAGE_UI):buildcache) \
 		$(if $(PUSH),--cache-to type=registry$(comma)ref=$(IMAGE_UI):buildcache$(comma)mode=max) \
 		$(if $(PUSH),--push,--load) \
