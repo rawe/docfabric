@@ -11,10 +11,10 @@ Manage documents in DocFabric via its REST API.
 
 Upload a local file to DocFabric.
 
-**Script**: `scripts/upload.py`
+**Script**: `${CLAUDE_PLUGIN_ROOT}/skills/docfabric/scripts/upload.py`
 
 ```bash
-uv run scripts/upload.py <file> [--metadata KEY=VALUE ...]
+uv run ${CLAUDE_PLUGIN_ROOT}/skills/docfabric/scripts/upload.py <file> [--metadata KEY=VALUE ...]
 ```
 
 **Parameters**:
@@ -29,10 +29,10 @@ The returned document ID identifies the document for subsequent MCP operations.
 
 Delete a document from DocFabric.
 
-**Script**: `scripts/delete.py`
+**Script**: `${CLAUDE_PLUGIN_ROOT}/skills/docfabric/scripts/delete.py`
 
 ```bash
-uv run scripts/delete.py <document-id>
+uv run ${CLAUDE_PLUGIN_ROOT}/skills/docfabric/scripts/delete.py <document-id>
 ```
 
 **Parameters**:

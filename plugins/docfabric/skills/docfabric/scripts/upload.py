@@ -8,9 +8,8 @@
 Sends a local file to the DocFabric REST API for ingestion and
 AI-optimized access.
 
-Requirements:
-    DOCFABRIC_URL   Environment variable pointing to the DocFabric server.
-                    Example: export DOCFABRIC_URL=http://localhost:8000
+Environment:
+    DOCFABRIC_URL   DocFabric server URL (default: http://localhost:8000)
 
 Supported formats: PDF, DOCX, PPTX, HTML, CSV, images.
 """

@@ -7,9 +7,8 @@
 
 Removes a document and its converted content from DocFabric via the REST API.
 
-Requirements:
-    DOCFABRIC_URL   Environment variable pointing to the DocFabric server.
-                    Example: export DOCFABRIC_URL=http://localhost:8000
+Environment:
+    DOCFABRIC_URL   DocFabric server URL (default: http://localhost:8000)
 """
 
 import argparse
