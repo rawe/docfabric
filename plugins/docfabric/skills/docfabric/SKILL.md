@@ -1,6 +1,6 @@
 ---
 name: docfabric
-description: "Manage documents in DocFabric. Use when the user wants to upload or delete documents."
+description: "Manage documents in DocFabric. Use when the user wants to upload, download, or delete documents."
 ---
 
 # Goal
@@ -24,6 +24,23 @@ uv run ${CLAUDE_PLUGIN_ROOT}/skills/docfabric/scripts/upload.py <file> [--metada
 **Output**: `<filename>: <document-id>`
 
 The returned document ID identifies the document for subsequent MCP operations.
+
+## Download
+
+Download a document from DocFabric to a local file.
+
+**Script**: `${CLAUDE_PLUGIN_ROOT}/skills/docfabric/scripts/download.py`
+
+```bash
+uv run ${CLAUDE_PLUGIN_ROOT}/skills/docfabric/scripts/download.py <document-id> <output-path> [--markdown]
+```
+
+**Parameters**:
+- `document-id` (required) — UUID of the document to download
+- `output-path` (required) — Local file path to write the document to
+- `--markdown` (optional) — Download the markdown representation instead of the original file
+
+**Output**: `<document-id>: saved to <output-path>`
 
 ## Delete
 
