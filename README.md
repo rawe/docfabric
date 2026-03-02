@@ -97,14 +97,14 @@ See [docs/releasing.md](docs/releasing.md) for Makefile targets, CI workflow, an
 
 ## Claude Code Plugin
 
-DocFabric ships a Claude Code plugin for document upload — the MCP server is read-only, so uploading requires the REST API. Install it from this repository's marketplace:
+DocFabric ships a Claude Code plugin for operations that require local filesystem access, which the read-only MCP server cannot provide. Install it from this repository's marketplace:
 
 ```bash
 claude plugin marketplace add rawe/docfabric
 claude plugin install docfabric@docfabric-marketplace
 ```
 
-This adds the `/docfabric:docfabric` skill, which lets Claude upload local files on your behalf.
+This adds the `/docfabric:docfabric` skill, which lets Claude manage documents between your local filesystem and DocFabric on your behalf.
 
 ## Documentation
 
