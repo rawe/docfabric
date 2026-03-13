@@ -5,12 +5,20 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
+class DocumentStatus(str, Enum):
+    processing = "processing"
+    ready = "ready"
+    error = "error"
+
+
 class DocumentMetadata(BaseModel):
     id: UUID
     filename: str
     content_type: str
     size_bytes: int
+    status: DocumentStatus
     metadata: dict[str, str]
+    error: str | None = None
     created_at: datetime
     updated_at: datetime
 

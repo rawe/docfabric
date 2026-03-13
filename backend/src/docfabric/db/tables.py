@@ -10,6 +10,8 @@ documents = sa.Table(
     sa.Column("content_type", sa.Text, nullable=False),
     sa.Column("size_bytes", sa.Integer, nullable=False),
     sa.Column("metadata", sa.JSON, nullable=False, server_default="{}"),
+    sa.Column("status", sa.Text, nullable=False, server_default="ready"),
+    sa.Column("error", sa.Text, nullable=True),
     sa.Column(
         "created_at",
         sa.DateTime(timezone=True),

@@ -12,7 +12,11 @@ from docfabric.conversion.converter import MarkdownConverter
 from docfabric.db.engine import create_engine, init_db
 from docfabric.db.repository import DocumentRepository
 from docfabric.mcp.server import create_mcp_server
-from docfabric.service.document import DocumentNotFoundError, DocumentService
+from docfabric.service.document import (
+    DocumentNotFoundError,
+    DocumentNotReadyError,
+    DocumentService,
+)
 from docfabric.storage import FileStorage
 
 
@@ -62,6 +66,19 @@ def create_app() -> FastAPI:
         request: Request, exc: DocumentNotFoundError
     ) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(DocumentNotReadyError)
+    async def document_not_ready_handler(
+        request: Request, exc: DocumentNotReadyError
+    ) -> JSONResponse:
+        if exc.status == "error":
+            detail = "Document processing failed. Content not available."
+        else:
+            detail = "Document is still processing. Content not available yet."
+        return JSONResponse(
+            status_code=409,
+            content={"detail": detail, "status": exc.status},
+        )
 
     @app.get("/health")
     async def health():

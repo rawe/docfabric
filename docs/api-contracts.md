@@ -1,4 +1,4 @@
-# API Contracts — Phase 1
+# API Contracts
 
 ## REST API
 
@@ -27,12 +27,14 @@ Upload a new document.
     "filename": "report.pdf",
     "content_type": "application/pdf",
     "size_bytes": 104857,
+    "status": "processing",
     "metadata": {},
+    "error": null,
     "created_at": "2026-02-28T12:00:00Z",
     "updated_at": "2026-02-28T12:00:00Z"
   }
   ```
-- **Behavior:** Stores original file, generates markdown via docling, persists both.
+- **Behavior:** Stores original file and returns immediately. Markdown conversion runs asynchronously in the background. The `status` field tracks processing progress (see [Document Status Lifecycle](#document-status-lifecycle)). For file types that need no conversion (e.g. `.md`), `status` is `ready` immediately.
 
 ### PUT /api/documents/{id}
 
@@ -40,8 +42,8 @@ Replace document file entirely.
 
 - **Request:** `multipart/form-data`
   - `file` (required) — replacement file
-- **Response:** `200 OK` — updated document metadata
-- **Behavior:** Replaces original file, regenerates markdown, updates `updated_at`.
+- **Response:** `200 OK` — updated document metadata (with `status: "processing"` for converted types)
+- **Behavior:** Replaces original file and returns immediately. Markdown re-conversion runs asynchronously. Any in-flight conversion for the previous version is cancelled.
 
 ### DELETE /api/documents/{id}
 
@@ -72,7 +74,7 @@ List all documents.
 
 Get document metadata.
 
-- **Response:** `200 OK` — document metadata object (no content)
+- **Response:** `200 OK` — document metadata object including `status` and `error` fields (no content)
 
 ### GET /api/documents/{id}/original
 
@@ -97,6 +99,10 @@ Read markdown representation.
   }
   ```
 - **Behavior:** Character-based slicing per PRD §6.7.
+- **Error:** Returns `409 Conflict` if the document is not yet ready (status is `processing` or `error`):
+  ```json
+  { "detail": "Document is still processing. Content not available yet.", "status": "processing" }
+  ```
 
 ### GET /api/documents/{id}/outline
 
@@ -116,7 +122,7 @@ Get document outline (heading structure).
     "total_length": 57
   }
   ```
-- **Errors:** `404` if document not found, `422` if no markdown content stored.
+- **Errors:** `404` if document not found, `409` if document is not ready (still processing or failed), `422` if invalid mode.
 
 ---
 
@@ -137,7 +143,7 @@ Read-only access. Four tools:
 
 - **Parameters:**
   - `document_id` (str, required)
-- **Returns:** Full document metadata object (JSON)
+- **Returns:** Full document metadata object (JSON), including `status` and `error` fields
 
 ### Tool: `get_document_outline`
 
@@ -148,6 +154,7 @@ Read-only access. Four tools:
   - `flat` (default): each section's `length` covers only its own text. Non-overlapping — suitable for sequential document processing.
   - `nested`: each section's `length` includes sub-headings. Parent ranges overlap with children — suitable for retrieving a full section with all its descendants.
 - **Rationale:** Lets an LLM navigate large documents structurally — scan headings first, then read only the relevant section.
+- If the document is still processing or failed, returns `{"error": "..."}` instead of the outline.
 
 ### Tool: `read_document_content`
 
@@ -155,7 +162,26 @@ Read-only access. Four tools:
   - `document_id` (str, required)
   - `offset` (int, optional) — character offset
   - `limit` (int, optional) — character count
-- **Returns:** Plain text markdown content. When paginated, includes a compact metadata footer
+- **Returns:** Plain text markdown content. When paginated, includes a compact metadata footer. If the document is still processing or failed, returns a human-readable error message (no exception) directing the LLM to check status via `get_document_info`.
+
+---
+
+## Document Status Lifecycle
+
+Documents have a `status` field that tracks conversion progress:
+
+```
+processing  →  ready
+processing  →  error
+```
+
+| Status | Meaning |
+|--------|---------|
+| `processing` | File stored, markdown conversion in progress |
+| `ready` | Conversion complete, content and outline available |
+| `error` | Conversion failed; original file still accessible, but content/outline are not |
+
+When status is `error`, the metadata includes an `error` field with a human-readable reason. File types that need no conversion (e.g. `.md`) skip straight to `ready`.
 
 ---
 
@@ -172,5 +198,6 @@ All endpoints return consistent error format:
 | Status | Meaning |
 |--------|---------|
 | 404 | Document not found |
+| 409 | Document not ready (content/outline requested while processing or after error) |
 | 422 | Validation error |
 | 500 | Internal server error |

@@ -6,7 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from docfabric.conversion.converter import MarkdownConverter
 from docfabric.db.repository import DocumentRepository
 from docfabric.models.document import OutlineMode
-from docfabric.service.document import DocumentNotFoundError, DocumentService
+from docfabric.service.document import (
+    DocumentNotFoundError,
+    DocumentNotReadyError,
+    DocumentService,
+)
 from docfabric.storage import FileStorage
 
 
@@ -40,7 +44,7 @@ def service(engine: AsyncEngine, storage: FileStorage, converter: MarkdownConver
 
 
 class TestDocumentService:
-    async def test_create(self, service: DocumentService):
+    async def test_create_returns_processing_for_pdf(self, service: DocumentService):
         doc = await service.create(
             filename="test.pdf",
             content_type="application/pdf",
@@ -51,6 +55,35 @@ class TestDocumentService:
         assert doc.content_type == "application/pdf"
         assert doc.size_bytes == 9
         assert doc.metadata == {"author": "tester"}
+        assert doc.status.value == "processing"
+
+    async def test_create_becomes_ready_after_processing(
+        self, service: DocumentService
+    ):
+        doc = await service.create(
+            filename="test.pdf",
+            content_type="application/pdf",
+            data=b"pdf bytes",
+        )
+        await service._wait_pending()
+        fetched = await service.get(doc.id)
+        assert fetched.status.value == "ready"
+
+    async def test_create_markdown_ready_immediately(self, service: DocumentService):
+        doc = await service.create(
+            filename="notes.md",
+            content_type="text/markdown",
+            data=b"# Hello world",
+        )
+        assert doc.status.value == "ready"
+
+    async def test_create_markdown_by_extension(self, service: DocumentService):
+        doc = await service.create(
+            filename="notes.md",
+            content_type="application/octet-stream",
+            data=b"# Hello world",
+        )
+        assert doc.status.value == "ready"
 
     async def test_get(self, service: DocumentService):
         created = await service.create(
@@ -87,6 +120,7 @@ class TestDocumentService:
             content_type="application/pdf",
             data=b"old data",
         )
+        await service._wait_pending()
         updated = await service.update(
             created.id,
             filename="new.pdf",
@@ -95,6 +129,24 @@ class TestDocumentService:
         )
         assert updated.filename == "new.pdf"
         assert updated.size_bytes == 13
+        assert updated.status.value == "processing"
+
+    async def test_update_becomes_ready(self, service: DocumentService):
+        created = await service.create(
+            filename="old.pdf",
+            content_type="application/pdf",
+            data=b"old data",
+        )
+        await service._wait_pending()
+        await service.update(
+            created.id,
+            filename="new.pdf",
+            content_type="application/pdf",
+            data=b"new data here",
+        )
+        await service._wait_pending()
+        fetched = await service.get(created.id)
+        assert fetched.status.value == "ready"
 
     async def test_update_not_found(self, service: DocumentService):
         with pytest.raises(DocumentNotFoundError):
@@ -111,6 +163,7 @@ class TestDocumentService:
             content_type="application/pdf",
             data=b"to delete",
         )
+        await service._wait_pending()
         await service.delete(created.id)
         with pytest.raises(DocumentNotFoundError):
             await service.get(created.id)
@@ -125,6 +178,7 @@ class TestDocumentService:
             content_type="application/pdf",
             data=b"pdf",
         )
+        await service._wait_pending()
         content = await service.get_content(created.id)
         assert content.content == "# Converted markdown"
         assert content.total_length == 20
@@ -137,13 +191,34 @@ class TestDocumentService:
             content_type="application/pdf",
             data=b"pdf",
         )
+        await service._wait_pending()
         content = await service.get_content(created.id, offset=2, limit=5)
         assert content.content == "Conve"
         assert content.offset == 2
         assert content.length == 5
         assert content.total_length == 20
 
-    async def test_create_cleans_up_on_conversion_failure(
+    async def test_get_content_while_processing_raises(self, service: DocumentService):
+        created = await service.create(
+            filename="content.pdf",
+            content_type="application/pdf",
+            data=b"pdf",
+        )
+        # Don't wait — document should still be processing
+        with pytest.raises(DocumentNotReadyError) as exc_info:
+            await service.get_content(created.id)
+        assert exc_info.value.status == "processing"
+
+    async def test_get_content_markdown_file_no_wait(self, service: DocumentService):
+        created = await service.create(
+            filename="notes.md",
+            content_type="text/markdown",
+            data=b"# Hello",
+        )
+        content = await service.get_content(created.id)
+        assert content.content == "# Hello"
+
+    async def test_conversion_failure_sets_error_status(
         self, engine: AsyncEngine, storage: FileStorage
     ):
         from unittest.mock import MagicMock, patch
@@ -162,18 +237,48 @@ class TestDocumentService:
             converter=bad_converter,
         )
 
-        with pytest.raises(RuntimeError, match="conversion failed"):
-            await svc.create(
-                filename="fail.pdf",
-                content_type="application/pdf",
-                data=b"bad pdf",
-            )
+        doc = await svc.create(
+            filename="fail.pdf",
+            content_type="application/pdf",
+            data=b"bad pdf",
+        )
+        assert doc.status.value == "processing"
 
-        # Verify cleanup happened — no files left behind
-        originals_dir = storage._base / "originals"
-        if originals_dir.exists():
-            remaining = list(originals_dir.iterdir())
-            assert remaining == []
+        await svc._wait_pending()
+
+        fetched = await svc.get(doc.id)
+        assert fetched.status.value == "error"
+        assert "conversion failed" in fetched.error
+
+    async def test_error_status_blocks_content(
+        self, engine: AsyncEngine, storage: FileStorage
+    ):
+        from unittest.mock import MagicMock, patch
+
+        with patch(
+            "docfabric.conversion.converter.DocumentConverter"
+        ) as mock_dc_class:
+            mock_instance = MagicMock()
+            mock_instance.convert.side_effect = RuntimeError("bad")
+            mock_dc_class.return_value = mock_instance
+            bad_converter = MarkdownConverter()
+
+        svc = DocumentService(
+            repository=DocumentRepository(engine),
+            storage=storage,
+            converter=bad_converter,
+        )
+
+        doc = await svc.create(
+            filename="fail.pdf",
+            content_type="application/pdf",
+            data=b"bad",
+        )
+        await svc._wait_pending()
+
+        with pytest.raises(DocumentNotReadyError) as exc_info:
+            await svc.get_content(doc.id)
+        assert exc_info.value.status == "error"
 
 
 async def _create_doc_with_markdown(
@@ -184,6 +289,7 @@ async def _create_doc_with_markdown(
         content_type="application/pdf",
         data=b"pdf bytes",
     )
+    await service._wait_pending()
     service._storage.save_markdown(doc.id, markdown)
     return doc.id
 
@@ -277,6 +383,15 @@ class TestGetOutline:
     async def test_not_found(self, service: DocumentService):
         with pytest.raises(DocumentNotFoundError):
             await service.get_outline(uuid4())
+
+    async def test_outline_while_processing_raises(self, service: DocumentService):
+        doc = await service.create(
+            filename="test.pdf",
+            content_type="application/pdf",
+            data=b"pdf bytes",
+        )
+        with pytest.raises(DocumentNotReadyError):
+            await service.get_outline(doc.id)
 
     async def test_offset_length_retrieves_correct_content(
         self, service: DocumentService

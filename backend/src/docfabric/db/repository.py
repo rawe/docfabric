@@ -19,6 +19,7 @@ class DocumentRepository:
         content_type: str,
         size_bytes: int,
         metadata: dict[str, str],
+        status: str = "ready",
     ) -> dict:
         now = datetime.now(UTC)
         values = {
@@ -27,6 +28,8 @@ class DocumentRepository:
             "content_type": content_type,
             "size_bytes": size_bytes,
             "metadata": metadata,
+            "status": status,
+            "error": None,
             "created_at": now,
             "updated_at": now,
         }
@@ -68,6 +71,7 @@ class DocumentRepository:
         filename: str,
         content_type: str,
         size_bytes: int,
+        status: str = "ready",
     ) -> dict | None:
         now = datetime.now(UTC)
         async with self._engine.begin() as conn:
@@ -78,12 +82,25 @@ class DocumentRepository:
                     filename=filename,
                     content_type=content_type,
                     size_bytes=size_bytes,
+                    status=status,
+                    error=None,
                     updated_at=now,
                 )
             )
             if result.rowcount == 0:
                 return None
         return await self.get(id)
+
+    async def update_status(
+        self, id: UUID, *, status: str, error: str | None = None
+    ) -> None:
+        now = datetime.now(UTC)
+        async with self._engine.begin() as conn:
+            await conn.execute(
+                documents.update()
+                .where(documents.c.id == str(id))
+                .values(status=status, error=error, updated_at=now)
+            )
 
     async def delete(self, id: UUID) -> bool:
         async with self._engine.begin() as conn:

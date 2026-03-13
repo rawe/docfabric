@@ -11,7 +11,11 @@ from docfabric.api.router import router
 from docfabric.conversion.converter import MarkdownConverter
 from docfabric.db.engine import create_engine, init_db
 from docfabric.db.repository import DocumentRepository
-from docfabric.service.document import DocumentNotFoundError, DocumentService
+from docfabric.service.document import (
+    DocumentNotFoundError,
+    DocumentNotReadyError,
+    DocumentService,
+)
 from docfabric.storage import FileStorage
 
 
@@ -52,6 +56,19 @@ async def app(tmp_path):
     ) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(exc)})
 
+    @app.exception_handler(DocumentNotReadyError)
+    async def document_not_ready_handler(
+        request: Request, exc: DocumentNotReadyError
+    ) -> JSONResponse:
+        if exc.status == "error":
+            detail = "Document processing failed. Content not available."
+        else:
+            detail = "Document is still processing. Content not available yet."
+        return JSONResponse(
+            status_code=409,
+            content={"detail": detail, "status": exc.status},
+        )
+
     @app.get("/health")
     async def health():
         return {"status": "ok"}
@@ -74,6 +91,10 @@ def _upload(filename="test.pdf", content=b"pdf bytes", content_type="application
     return {"file": (filename, content, content_type)}
 
 
+async def _wait(app: FastAPI) -> None:
+    await app.state.document_service._wait_pending()
+
+
 class TestHealth:
     async def test_health(self, client: httpx.AsyncClient):
         resp = await client.get("/health")
@@ -89,7 +110,18 @@ class TestCreateDocument:
         assert body["filename"] == "test.pdf"
         assert body["content_type"] == "application/pdf"
         assert body["size_bytes"] == 9
+        assert body["status"] == "processing"
         assert "id" in body
+
+    async def test_create_markdown_file_ready_immediately(
+        self, client: httpx.AsyncClient
+    ):
+        resp = await client.post(
+            "/api/documents",
+            files={"file": ("notes.md", b"# Hello", "text/markdown")},
+        )
+        assert resp.status_code == 201
+        assert resp.json()["status"] == "ready"
 
     async def test_create_with_metadata(self, client: httpx.AsyncClient):
         resp = await client.post(
@@ -146,12 +178,22 @@ class TestListDocuments:
 
 
 class TestGetDocument:
-    async def test_found(self, client: httpx.AsyncClient):
+    async def test_found(self, app, client: httpx.AsyncClient):
         create_resp = await client.post("/api/documents", files=_upload())
         doc_id = create_resp.json()["id"]
+        await _wait(app)
         resp = await client.get(f"/api/documents/{doc_id}")
         assert resp.status_code == 200
         assert resp.json()["id"] == doc_id
+        assert resp.json()["status"] == "ready"
+
+    async def test_status_processing(self, client: httpx.AsyncClient):
+        create_resp = await client.post("/api/documents", files=_upload())
+        doc_id = create_resp.json()["id"]
+        # Don't wait — status should still be processing (or ready if fast)
+        resp = await client.get(f"/api/documents/{doc_id}")
+        assert resp.status_code == 200
+        assert resp.json()["status"] in ("processing", "ready")
 
     async def test_not_found(self, client: httpx.AsyncClient):
         resp = await client.get(f"/api/documents/{uuid4()}")
@@ -163,9 +205,10 @@ class TestGetDocument:
 
 
 class TestUpdateDocument:
-    async def test_update(self, client: httpx.AsyncClient):
+    async def test_update(self, app, client: httpx.AsyncClient):
         create_resp = await client.post("/api/documents", files=_upload())
         doc_id = create_resp.json()["id"]
+        await _wait(app)
 
         resp = await client.put(
             f"/api/documents/{doc_id}",
@@ -175,6 +218,21 @@ class TestUpdateDocument:
         body = resp.json()
         assert body["filename"] == "updated.pdf"
         assert body["size_bytes"] == 11
+        assert body["status"] == "processing"
+
+    async def test_update_becomes_ready(self, app, client: httpx.AsyncClient):
+        create_resp = await client.post("/api/documents", files=_upload())
+        doc_id = create_resp.json()["id"]
+        await _wait(app)
+
+        await client.put(
+            f"/api/documents/{doc_id}",
+            files=_upload("updated.pdf", b"new content"),
+        )
+        await _wait(app)
+
+        resp = await client.get(f"/api/documents/{doc_id}")
+        assert resp.json()["status"] == "ready"
 
     async def test_not_found(self, client: httpx.AsyncClient):
         resp = await client.put(
@@ -185,9 +243,10 @@ class TestUpdateDocument:
 
 
 class TestDeleteDocument:
-    async def test_delete(self, client: httpx.AsyncClient):
+    async def test_delete(self, app, client: httpx.AsyncClient):
         create_resp = await client.post("/api/documents", files=_upload())
         doc_id = create_resp.json()["id"]
+        await _wait(app)
 
         resp = await client.delete(f"/api/documents/{doc_id}")
         assert resp.status_code == 204
@@ -202,9 +261,10 @@ class TestDeleteDocument:
 
 
 class TestGetDocumentContent:
-    async def test_full_content(self, client: httpx.AsyncClient):
+    async def test_full_content(self, app, client: httpx.AsyncClient):
         create_resp = await client.post("/api/documents", files=_upload())
         doc_id = create_resp.json()["id"]
+        await _wait(app)
 
         resp = await client.get(f"/api/documents/{doc_id}/content")
         assert resp.status_code == 200
@@ -214,9 +274,10 @@ class TestGetDocumentContent:
         assert body["offset"] == 0
         assert body["length"] == 20
 
-    async def test_with_offset_and_limit(self, client: httpx.AsyncClient):
+    async def test_with_offset_and_limit(self, app, client: httpx.AsyncClient):
         create_resp = await client.post("/api/documents", files=_upload())
         doc_id = create_resp.json()["id"]
+        await _wait(app)
 
         resp = await client.get(
             f"/api/documents/{doc_id}/content",
@@ -232,6 +293,17 @@ class TestGetDocumentContent:
         resp = await client.get(f"/api/documents/{uuid4()}/content")
         assert resp.status_code == 404
 
+    async def test_conflict_while_processing(self, client: httpx.AsyncClient):
+        resp = await client.post("/api/documents", files=_upload())
+        doc_id = resp.json()["id"]
+        # Don't wait — attempt to read content immediately
+        content_resp = await client.get(f"/api/documents/{doc_id}/content")
+        # May be 409 (still processing) or 200 (already done)
+        assert content_resp.status_code in (200, 409)
+        if content_resp.status_code == 409:
+            body = content_resp.json()
+            assert body["status"] == "processing"
+
 
 class TestGetDocumentOutline:
     _OUTLINE_MD = (
@@ -244,6 +316,7 @@ class TestGetDocumentOutline:
 
         resp = await client.post("/api/documents", files=_upload())
         doc_id = resp.json()["id"]
+        await _wait(app)
         service = app.state.document_service
         service._storage.save_markdown(UUID(doc_id), markdown)
         return doc_id
@@ -284,11 +357,21 @@ class TestGetDocumentOutline:
         )
         assert resp.status_code == 422
 
+    async def test_conflict_while_processing(self, client: httpx.AsyncClient):
+        resp = await client.post("/api/documents", files=_upload())
+        doc_id = resp.json()["id"]
+        outline_resp = await client.get(f"/api/documents/{doc_id}/outline")
+        assert outline_resp.status_code in (200, 409)
+        if outline_resp.status_code == 409:
+            body = outline_resp.json()
+            assert body["status"] == "processing"
+
 
 class TestGetDocumentOriginal:
-    async def test_original(self, client: httpx.AsyncClient):
+    async def test_original(self, app, client: httpx.AsyncClient):
         create_resp = await client.post("/api/documents", files=_upload())
         doc_id = create_resp.json()["id"]
+        await _wait(app)
 
         resp = await client.get(f"/api/documents/{doc_id}/original")
         assert resp.status_code == 200

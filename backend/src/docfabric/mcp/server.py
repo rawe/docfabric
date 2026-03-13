@@ -4,7 +4,7 @@ from uuid import UUID
 from mcp.server.fastmcp import FastMCP
 
 from docfabric.models.document import OutlineMode
-from docfabric.service.document import DocumentService
+from docfabric.service.document import DocumentNotReadyError, DocumentService
 
 
 def create_mcp_server(get_service: Callable[[], DocumentService]) -> FastMCP:
@@ -59,9 +59,20 @@ def create_mcp_server(get_service: Callable[[], DocumentService]) -> FastMCP:
             offset: Character offset to start reading from.
             limit: Maximum number of characters to return.
         """
-        result = await get_service().get_content(
-            UUID(document_id), offset=offset, limit=limit
-        )
+        try:
+            result = await get_service().get_content(
+                UUID(document_id), offset=offset, limit=limit
+            )
+        except DocumentNotReadyError as exc:
+            if exc.status == "error":
+                return (
+                    "Document processing failed. Content is not available. "
+                    "Use get_document_info to check the error."
+                )
+            return (
+                "Document is still being processed. Try again later. "
+                "Use get_document_info to check status."
+            )
         text = result.content
         if result.length < result.total_length:
             text += (
@@ -85,9 +96,20 @@ def create_mcp_server(get_service: Callable[[], DocumentService]) -> FastMCP:
             mode: 'flat' (default) — each section covers only its own text.
                   'nested' — each section's length includes its sub-headings.
         """
-        result = await get_service().get_outline(
-            UUID(document_id), mode=OutlineMode(mode)
-        )
+        try:
+            result = await get_service().get_outline(
+                UUID(document_id), mode=OutlineMode(mode)
+            )
+        except DocumentNotReadyError as exc:
+            if exc.status == "error":
+                return {
+                    "error": "Document processing failed. Outline is not available. "
+                    "Use get_document_info to check the error."
+                }
+            return {
+                "error": "Document is still being processed. Try again later. "
+                "Use get_document_info to check status."
+            }
         return result.model_dump()
 
     return mcp

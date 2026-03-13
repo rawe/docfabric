@@ -5,7 +5,6 @@ from fastapi import APIRouter, Query, Request, Response, UploadFile
 from fastapi import Form as FormField
 from fastapi import HTTPException
 
-from docfabric.conversion.converter import ConversionError
 from docfabric.models.document import OutlineMode
 from docfabric.service.document import DocumentService
 
@@ -35,18 +34,12 @@ async def create_document(
     content_type = file.content_type or "application/octet-stream"
     data = await file.read()
 
-    try:
-        doc = await service.create(
-            filename=filename,
-            content_type=content_type,
-            data=data,
-            metadata=parsed_metadata,
-        )
-    except ConversionError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Document conversion failed: {exc}",
-        )
+    doc = await service.create(
+        filename=filename,
+        content_type=content_type,
+        data=data,
+        metadata=parsed_metadata,
+    )
     return doc
 
 
@@ -78,18 +71,12 @@ async def update_document(
     content_type = file.content_type or "application/octet-stream"
     data = await file.read()
 
-    try:
-        return await service.update(
-            document_id,
-            filename=filename,
-            content_type=content_type,
-            data=data,
-        )
-    except ConversionError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Document conversion failed: {exc}",
-        )
+    return await service.update(
+        document_id,
+        filename=filename,
+        content_type=content_type,
+        data=data,
+    )
 
 
 @router.delete("/documents/{document_id}", status_code=204)

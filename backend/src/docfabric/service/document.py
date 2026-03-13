@@ -1,19 +1,25 @@
+import asyncio
 import re
+from pathlib import Path
 from uuid import UUID, uuid4
 
-from docfabric.conversion.converter import ConversionError, MarkdownConverter
+from docfabric.conversion.converter import MarkdownConverter
 from docfabric.db.repository import DocumentRepository
 from docfabric.models.document import (
     DocumentContent,
     DocumentList,
     DocumentMetadata,
     DocumentOutline,
+    DocumentStatus,
     OutlineMode,
     OutlineSection,
 )
 from docfabric.storage import FileStorage
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
+
+_NO_CONVERSION_TYPES = frozenset({"text/markdown", "text/x-markdown"})
+_NO_CONVERSION_EXTENSIONS = frozenset({".md", ".markdown"})
 
 
 class DocumentNotFoundError(Exception):
@@ -22,8 +28,23 @@ class DocumentNotFoundError(Exception):
         super().__init__(f"Document {document_id} not found")
 
 
+class DocumentNotReadyError(Exception):
+    def __init__(self, document_id: UUID, status: str) -> None:
+        self.document_id = document_id
+        self.status = status
+        super().__init__(f"Document {document_id} is not ready (status={status})")
+
+
 def _row_to_metadata(row: dict) -> DocumentMetadata:
     return DocumentMetadata.model_validate(row)
+
+
+def _needs_conversion(filename: str, content_type: str) -> bool:
+    if content_type in _NO_CONVERSION_TYPES:
+        return False
+    if Path(filename).suffix.lower() in _NO_CONVERSION_EXTENSIONS:
+        return False
+    return True
 
 
 class DocumentService:
@@ -36,6 +57,7 @@ class DocumentService:
         self._repo = repository
         self._storage = storage
         self._converter = converter
+        self._tasks: dict[UUID, asyncio.Task] = {}
 
     async def create(
         self,
@@ -49,15 +71,12 @@ class DocumentService:
         meta = metadata or {}
 
         original_path = self._storage.save_original(doc_id, filename, data)
-        try:
-            markdown = self._converter.convert(original_path)
-        except ConversionError:
-            self._storage.delete(doc_id)
-            raise
-        except Exception as exc:
-            self._storage.delete(doc_id)
-            raise ConversionError(str(exc)) from exc
-        self._storage.save_markdown(doc_id, markdown)
+
+        if _needs_conversion(filename, content_type):
+            status = "processing"
+        else:
+            self._storage.save_markdown(doc_id, data.decode("utf-8"))
+            status = "ready"
 
         row = await self._repo.insert(
             id=doc_id,
@@ -65,7 +84,12 @@ class DocumentService:
             content_type=content_type,
             size_bytes=len(data),
             metadata=meta,
+            status=status,
         )
+
+        if status == "processing":
+            self._start_processing(doc_id, original_path)
+
         return _row_to_metadata(row)
 
     async def get(self, document_id: UUID) -> DocumentMetadata:
@@ -95,27 +119,37 @@ class DocumentService:
         if existing is None:
             raise DocumentNotFoundError(document_id)
 
+        old_task = self._tasks.pop(document_id, None)
+        if old_task and not old_task.done():
+            old_task.cancel()
+
         self._storage.delete(document_id)
         original_path = self._storage.save_original(document_id, filename, data)
-        try:
-            markdown = self._converter.convert(original_path)
-        except ConversionError:
-            self._storage.delete(document_id)
-            raise
-        except Exception as exc:
-            self._storage.delete(document_id)
-            raise ConversionError(str(exc)) from exc
-        self._storage.save_markdown(document_id, markdown)
+
+        if _needs_conversion(filename, content_type):
+            status = "processing"
+        else:
+            self._storage.save_markdown(document_id, data.decode("utf-8"))
+            status = "ready"
 
         row = await self._repo.update(
             document_id,
             filename=filename,
             content_type=content_type,
             size_bytes=len(data),
+            status=status,
         )
+
+        if status == "processing":
+            self._start_processing(document_id, original_path)
+
         return _row_to_metadata(row)
 
     async def delete(self, document_id: UUID) -> None:
+        old_task = self._tasks.pop(document_id, None)
+        if old_task and not old_task.done():
+            old_task.cancel()
+
         existed = await self._repo.delete(document_id)
         if not existed:
             raise DocumentNotFoundError(document_id)
@@ -128,7 +162,10 @@ class DocumentService:
         offset: int | None = None,
         limit: int | None = None,
     ) -> DocumentContent:
-        await self.get(document_id)
+        doc = await self.get(document_id)
+        if doc.status != DocumentStatus.ready:
+            raise DocumentNotReadyError(document_id, doc.status.value)
+
         full = self._storage.read_markdown(document_id)
         total_length = len(full)
 
@@ -152,7 +189,10 @@ class DocumentService:
         *,
         mode: OutlineMode = OutlineMode.flat,
     ) -> DocumentOutline:
-        await self.get(document_id)
+        doc = await self.get(document_id)
+        if doc.status != DocumentStatus.ready:
+            raise DocumentNotReadyError(document_id, doc.status.value)
+
         text = self._storage.read_markdown(document_id)
         total = len(text)
 
@@ -190,3 +230,30 @@ class DocumentService:
 
     def get_original(self, document_id: UUID, filename: str) -> bytes:
         return self._storage.read_original(document_id, filename)
+
+    def _start_processing(self, doc_id: UUID, original_path: Path) -> None:
+        old_task = self._tasks.pop(doc_id, None)
+        if old_task and not old_task.done():
+            old_task.cancel()
+        task = asyncio.create_task(self._process_document(doc_id, original_path))
+        self._tasks[doc_id] = task
+        task.add_done_callback(lambda _: self._tasks.pop(doc_id, None))
+
+    async def _process_document(self, doc_id: UUID, original_path: Path) -> None:
+        try:
+            markdown = await asyncio.to_thread(
+                self._converter.convert, original_path
+            )
+            self._storage.save_markdown(doc_id, markdown)
+            await self._repo.update_status(doc_id, status="ready")
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            await self._repo.update_status(
+                doc_id, status="error", error=str(exc)
+            )
+
+    async def _wait_pending(self) -> None:
+        tasks = list(self._tasks.values())
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)

@@ -1,4 +1,4 @@
-# Architecture — Phase 1
+# Architecture
 
 ## System Overview
 
@@ -45,7 +45,7 @@ DocFabric runs as a **single Python process** exposing two interfaces:
 | Markdown conversion | docling | Multi-format support, high-quality PDF/table extraction |
 | Accepted formats | PDF, DOCX, PPTX, HTML, CSV, Images | No EPUB in Phase 1 |
 | Conversion mode | CPU-only | GPU support deferred; simpler deployment |
-| Conversion concurrency | Synchronous (blocking) | Async processing is a future concern |
+| Conversion concurrency | Async background tasks (`asyncio.create_task` + `to_thread`) | Upload returns immediately; conversion runs in a thread pool off the request path |
 | Database | SQLite (Phase 1) | Zero-config, file-based, sufficient for MVP |
 | DB access | SQLAlchemy Core (async) + aiosqlite | Dialect abstraction enables future DB swap without rewriting queries |
 | File storage | Local filesystem | Simple, sufficient for Phase 1 |
@@ -67,8 +67,9 @@ Read-only tools for LLM access: list documents, get document info, get document 
 ### Document Service
 Core business logic. Orchestrates:
 - File persistence (save/delete originals)
-- Markdown generation (via docling)
+- Async markdown generation (via docling in background tasks)
 - Database operations (via repository)
+- Background task lifecycle: tracks in-flight conversion tasks per document, cancels stale tasks on update/delete
 
 ### Document Repository
 Data access via SQLAlchemy Core async engine. Abstracts all SQL. Swappable by changing the connection string (e.g., `sqlite+aiosqlite:///` → `postgresql+asyncpg://`).
@@ -119,6 +120,8 @@ Single table `documents`:
 | content_type | TEXT | MIME type |
 | size_bytes | INTEGER | Original file size |
 | metadata | JSON | Free-form key-value |
+| status | TEXT | `processing`, `ready`, or `error` |
+| error | TEXT (nullable) | Human-readable error message when status is `error` |
 | created_at | TIMESTAMP | UTC, set on create |
 | updated_at | TIMESTAMP | UTC, set on create/update |
 
@@ -137,4 +140,4 @@ SQLAlchemy Core provides the abstraction layer:
 
 - **Health endpoint:** `GET /health` returns 200 OK for readiness probes
 - **Docling footprint:** ~1-2 GB install (PyTorch + ML models) accepted for Phase 1
-- **Future:** Async document conversion (queue-based) planned for scaling beyond MVP
+- **Async processing:** Document uploads return immediately; markdown conversion runs in background threads via `asyncio.create_task(asyncio.to_thread(...))`. A `status` field (`processing` → `ready` | `error`) lets consumers poll for completion. Content and outline endpoints return 409 while processing.

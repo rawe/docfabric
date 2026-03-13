@@ -66,6 +66,7 @@ async def _create_doc(service: DocumentService, filename="test.pdf") -> str:
         content_type="application/pdf",
         data=b"pdf bytes",
     )
+    await service._wait_pending()
     return str(doc.id)
 
 
@@ -145,6 +146,7 @@ class TestGetDocumentInfo:
         assert data["filename"] == "test.pdf"
         assert data["content_type"] == "application/pdf"
         assert data["size_bytes"] == 9
+        assert data["status"] == "ready"
         assert "created_at" in data
         assert "updated_at" in data
 
@@ -192,6 +194,23 @@ class TestReadDocumentContent:
             await mcp_client.call_tool(
                 "read_document_content", {"document_id": str(uuid4())}
             )
+
+    async def test_processing_returns_message(self, mcp_client: Client, service):
+        doc = await service.create(
+            filename="test.pdf",
+            content_type="application/pdf",
+            data=b"pdf bytes",
+        )
+        # Don't wait — read content while still processing
+        result = await mcp_client.call_tool(
+            "read_document_content", {"document_id": str(doc.id)}
+        )
+        text = result.content[0].text
+        # May have completed already, but if not, should get a processing message
+        if "still being processed" in text:
+            assert "get_document_info" in text
+        else:
+            assert text == "# Converted markdown"
 
 
 _OUTLINE_MD = """\
@@ -307,3 +326,19 @@ class TestGetDocumentOutline:
             await mcp_client.call_tool(
                 "get_document_outline", {"document_id": str(uuid4())}
             )
+
+    async def test_processing_returns_message(self, mcp_client: Client, service):
+        doc = await service.create(
+            filename="test.pdf",
+            content_type="application/pdf",
+            data=b"pdf bytes",
+        )
+        result = await mcp_client.call_tool(
+            "get_document_outline", {"document_id": str(doc.id)}
+        )
+        data = _parse_tool_result(result)
+        if "error" in data:
+            assert "still being processed" in data["error"]
+        else:
+            # Background task already completed
+            assert "sections" in data
