@@ -1,6 +1,6 @@
 from uuid import UUID, uuid4
 
-from docfabric.conversion.converter import MarkdownConverter
+from docfabric.conversion.converter import ConversionError, MarkdownConverter
 from docfabric.db.repository import DocumentRepository
 from docfabric.models.document import (
     DocumentContent,
@@ -45,9 +45,12 @@ class DocumentService:
         original_path = self._storage.save_original(doc_id, filename, data)
         try:
             markdown = self._converter.convert(original_path)
-        except Exception:
+        except ConversionError:
             self._storage.delete(doc_id)
             raise
+        except Exception as exc:
+            self._storage.delete(doc_id)
+            raise ConversionError(str(exc)) from exc
         self._storage.save_markdown(doc_id, markdown)
 
         row = await self._repo.insert(
@@ -90,9 +93,12 @@ class DocumentService:
         original_path = self._storage.save_original(document_id, filename, data)
         try:
             markdown = self._converter.convert(original_path)
-        except Exception:
+        except ConversionError:
             self._storage.delete(document_id)
             raise
+        except Exception as exc:
+            self._storage.delete(document_id)
+            raise ConversionError(str(exc)) from exc
         self._storage.save_markdown(document_id, markdown)
 
         row = await self._repo.update(

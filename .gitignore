@@ -20,3 +20,6 @@ storage/
 *.db
 dist/
 .ruff_cache/
+
+# Tests
+_test_docs
