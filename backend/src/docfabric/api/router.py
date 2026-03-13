@@ -6,6 +6,7 @@ from fastapi import Form as FormField
 from fastapi import HTTPException
 
 from docfabric.conversion.converter import ConversionError
+from docfabric.models.document import OutlineMode
 from docfabric.service.document import DocumentService
 
 router = APIRouter()
@@ -106,6 +107,16 @@ async def get_document_content(
 ):
     service = get_document_service(request)
     return await service.get_content(document_id, offset=offset, limit=limit)
+
+
+@router.get("/documents/{document_id}/outline")
+async def get_document_outline(
+    request: Request,
+    document_id: UUID,
+    mode: OutlineMode = Query(default=OutlineMode.flat),
+):
+    service = get_document_service(request)
+    return await service.get_outline(document_id, mode=mode)
 
 
 @router.get("/documents/{document_id}/original")

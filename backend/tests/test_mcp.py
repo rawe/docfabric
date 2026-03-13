@@ -218,11 +218,9 @@ class TestGetDocumentOutline:
         assert len(sections) == 4
         assert data["total_length"] == len(_OUTLINE_MD)
 
-        # Check field names
         for s in sections:
             assert set(s.keys()) == {"level", "title", "offset", "length"}
 
-        # Check titles and levels in order
         assert sections[0]["title"] == "Introduction"
         assert sections[0]["level"] == 1
         assert sections[1]["title"] == "Background"
@@ -232,7 +230,7 @@ class TestGetDocumentOutline:
         assert sections[3]["title"] == "Methods"
         assert sections[3]["level"] == 2
 
-    async def test_h1_spans_entire_document(
+    async def test_flat_default_h1_only_covers_own_text(
         self, mcp_client: Client, service
     ):
         doc_id = await _create_doc_with_markdown(service, _OUTLINE_MD)
@@ -241,24 +239,35 @@ class TestGetDocumentOutline:
         )
         data = _parse_tool_result(result)
         h1 = data["sections"][0]
-        assert h1["offset"] == 0
-        assert h1["length"] == len(_OUTLINE_MD)
+        h2_bg = data["sections"][1]
+        # H1 stops at H2 in flat mode
+        assert h1["offset"] + h1["length"] == h2_bg["offset"]
 
-    async def test_h2_includes_its_subheadings(
+    async def test_nested_h1_spans_entire_document(
         self, mcp_client: Client, service
     ):
         doc_id = await _create_doc_with_markdown(service, _OUTLINE_MD)
         result = await mcp_client.call_tool(
-            "get_document_outline", {"document_id": doc_id}
+            "get_document_outline", {"document_id": doc_id, "mode": "nested"}
         )
         data = _parse_tool_result(result)
-        bg = data["sections"][1]  # Background (H2)
-        details = data["sections"][2]  # Details (H3)
-        methods = data["sections"][3]  # Methods (H2)
+        h1 = data["sections"][0]
+        assert h1["offset"] == 0
+        assert h1["length"] == len(_OUTLINE_MD)
 
-        # Background section includes Details subsection
+    async def test_nested_h2_includes_its_subheadings(
+        self, mcp_client: Client, service
+    ):
+        doc_id = await _create_doc_with_markdown(service, _OUTLINE_MD)
+        result = await mcp_client.call_tool(
+            "get_document_outline", {"document_id": doc_id, "mode": "nested"}
+        )
+        data = _parse_tool_result(result)
+        bg = data["sections"][1]
+        details = data["sections"][2]
+        methods = data["sections"][3]
+
         assert bg["offset"] + bg["length"] == methods["offset"]
-        # Details is contained within Background
         assert details["offset"] >= bg["offset"]
         assert details["offset"] + details["length"] <= bg["offset"] + bg["length"]
 

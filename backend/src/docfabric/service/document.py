@@ -1,3 +1,4 @@
+import re
 from uuid import UUID, uuid4
 
 from docfabric.conversion.converter import ConversionError, MarkdownConverter
@@ -6,8 +7,13 @@ from docfabric.models.document import (
     DocumentContent,
     DocumentList,
     DocumentMetadata,
+    DocumentOutline,
+    OutlineMode,
+    OutlineSection,
 )
 from docfabric.storage import FileStorage
+
+_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 
 
 class DocumentNotFoundError(Exception):
@@ -139,6 +145,40 @@ class DocumentService:
             offset=start,
             length=len(sliced),
         )
+
+    async def get_outline(
+        self,
+        document_id: UUID,
+        *,
+        mode: OutlineMode = OutlineMode.flat,
+    ) -> DocumentOutline:
+        await self.get(document_id)
+        text = self._storage.read_markdown(document_id)
+        total = len(text)
+
+        headings = [
+            (m.start(), len(m.group(1)), m.group(2).strip())
+            for m in _HEADING_RE.finditer(text)
+        ]
+
+        sections = []
+        for i, (start, level, title) in enumerate(headings):
+            if mode is OutlineMode.nested:
+                end = total
+                for future_start, future_level, _ in headings[i + 1 :]:
+                    if future_level <= level:
+                        end = future_start
+                        break
+            else:
+                if i + 1 < len(headings):
+                    end = headings[i + 1][0]
+                else:
+                    end = total
+            sections.append(
+                OutlineSection(level=level, title=title, offset=start, length=end - start)
+            )
+
+        return DocumentOutline(sections=sections, total_length=total)
 
     def get_original(self, document_id: UUID, filename: str) -> bytes:
         return self._storage.read_original(document_id, filename)

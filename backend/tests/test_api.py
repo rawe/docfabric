@@ -233,6 +233,58 @@ class TestGetDocumentContent:
         assert resp.status_code == 404
 
 
+class TestGetDocumentOutline:
+    _OUTLINE_MD = (
+        "# Introduction\nIntro text.\n## Background\nBackground text.\n"
+        "## Methods\nMethods text."
+    )
+
+    async def _create_with_markdown(self, app, client, markdown: str) -> str:
+        from uuid import UUID
+
+        resp = await client.post("/api/documents", files=_upload())
+        doc_id = resp.json()["id"]
+        service = app.state.document_service
+        service._storage.save_markdown(UUID(doc_id), markdown)
+        return doc_id
+
+    async def test_flat_default(self, app, client: httpx.AsyncClient):
+        doc_id = await self._create_with_markdown(app, client, self._OUTLINE_MD)
+        resp = await client.get(f"/api/documents/{doc_id}/outline")
+        assert resp.status_code == 200
+        body = resp.json()
+        sections = body["sections"]
+        assert len(sections) == 3
+        assert body["total_length"] == len(self._OUTLINE_MD)
+
+        # Non-overlapping: each starts where previous ends
+        for i in range(1, len(sections)):
+            prev_end = sections[i - 1]["offset"] + sections[i - 1]["length"]
+            assert sections[i]["offset"] == prev_end
+
+    async def test_nested_mode(self, app, client: httpx.AsyncClient):
+        doc_id = await self._create_with_markdown(app, client, self._OUTLINE_MD)
+        resp = await client.get(
+            f"/api/documents/{doc_id}/outline", params={"mode": "nested"}
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        h1 = body["sections"][0]
+        assert h1["offset"] == 0
+        assert h1["length"] == len(self._OUTLINE_MD)
+
+    async def test_not_found(self, client: httpx.AsyncClient):
+        resp = await client.get(f"/api/documents/{uuid4()}/outline")
+        assert resp.status_code == 404
+
+    async def test_invalid_mode(self, app, client: httpx.AsyncClient):
+        doc_id = await self._create_with_markdown(app, client, self._OUTLINE_MD)
+        resp = await client.get(
+            f"/api/documents/{doc_id}/outline", params={"mode": "invalid"}
+        )
+        assert resp.status_code == 422
+
+
 class TestGetDocumentOriginal:
     async def test_original(self, client: httpx.AsyncClient):
         create_resp = await client.post("/api/documents", files=_upload())

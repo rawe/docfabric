@@ -98,6 +98,26 @@ Read markdown representation.
   ```
 - **Behavior:** Character-based slicing per PRD §6.7.
 
+### GET /api/documents/{id}/outline
+
+Get document outline (heading structure).
+
+- **Query params:**
+  - `mode` (string, optional, default `flat`) — `flat` or `nested`
+    - `flat`: each section's `length` covers only its own text, up to the next heading of any level. Sections are non-overlapping; concatenating them reconstructs the full document.
+    - `nested`: each section's `length` extends to the next heading at the same or higher level, including all sub-headings. Sections overlap — parent ranges contain their children.
+- **Response:** `200 OK`
+  ```json
+  {
+    "sections": [
+      { "level": 1, "title": "Introduction", "offset": 0, "length": 32 },
+      { "level": 2, "title": "Background",   "offset": 32, "length": 25 }
+    ],
+    "total_length": 57
+  }
+  ```
+- **Errors:** `404` if document not found, `422` if no markdown content stored.
+
 ---
 
 ## MCP Server
@@ -123,8 +143,11 @@ Read-only access. Four tools:
 
 - **Parameters:**
   - `document_id` (str, required)
-- **Returns:** Flat list of heading sections with `level`, `title`, `offset`, `length`. Each section's `length` includes its sub-headings. The `offset` and `length` values map directly to `read_document_content` parameters, enabling precise section retrieval without reading the entire document.
-- **Rationale:** Lets an LLM navigate large documents structurally — scan headings first, then read only the relevant section. Implemented entirely in the MCP layer by parsing stored markdown; no new service methods or models.
+  - `mode` (str, optional, default `flat`) — `flat` or `nested`
+- **Returns:** Flat list of heading sections with `level`, `title`, `offset`, `length`, plus `total_length`. The `offset` and `length` values map directly to `read_document_content` parameters, enabling precise section retrieval without reading the entire document.
+  - `flat` (default): each section's `length` covers only its own text. Non-overlapping — suitable for sequential document processing.
+  - `nested`: each section's `length` includes sub-headings. Parent ranges overlap with children — suitable for retrieving a full section with all its descendants.
+- **Rationale:** Lets an LLM navigate large documents structurally — scan headings first, then read only the relevant section.
 
 ### Tool: `read_document_content`
 
