@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { getDocumentContent } from "../api/client";
+import { ApiError, getDocumentContent } from "../api/client";
 
 export function DocumentPreviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -13,9 +13,17 @@ export function DocumentPreviewPage() {
     queryKey: ["content", id],
     queryFn: () => getDocumentContent(id!),
     enabled: !!id,
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && err.status === 409) return failureCount < 60;
+      return failureCount < 1;
+    },
+    retryDelay: 2000,
   });
 
-  if (isLoading) return <p>Loading...</p>;
+  const isProcessing = error instanceof ApiError && error.status === 409;
+
+  if (isLoading || isProcessing)
+    return <p>{isProcessing ? "Document is still processing..." : "Loading..."}</p>;
   if (error) return <p className="error">Error: {(error as Error).message}</p>;
   if (!data) return null;
 

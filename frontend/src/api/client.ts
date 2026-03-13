@@ -2,11 +2,19 @@ import type { DocumentContent, DocumentList, DocumentMetadata } from "../types/d
 
 const BASE = "/api";
 
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, init);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(body.detail ?? `Request failed: ${res.status}`);
+    throw new ApiError(body.detail ?? `Request failed: ${res.status}`, res.status);
   }
   return res.json();
 }

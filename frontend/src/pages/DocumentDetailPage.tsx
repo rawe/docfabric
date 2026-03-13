@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { deleteDocument, getDocument, getOriginalUrl, replaceDocument } from "../api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { StatusBadge } from "../components/StatusBadge";
 
 export function DocumentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,9 @@ export function DocumentDetailPage() {
     queryKey: ["document", id],
     queryFn: () => getDocument(id!),
     enabled: !!id,
+    refetchInterval: (query) => {
+      return query.state.data?.status === "processing" ? 2000 : false;
+    },
   });
 
   const replaceMutation = useMutation({
@@ -53,7 +57,12 @@ export function DocumentDetailPage() {
 
       <div className="page-header">
         <h1>{doc.filename}</h1>
+        <StatusBadge status={doc.status} />
       </div>
+
+      {doc.status === "error" && doc.error && (
+        <p className="error">{doc.error}</p>
+      )}
 
       <dl className="metadata">
         <dt>ID</dt>
@@ -77,9 +86,13 @@ export function DocumentDetailPage() {
       </dl>
 
       <div className="actions">
-        <Link to={`/documents/${doc.id}/preview`} className="button">
-          View Content
-        </Link>
+        {doc.status === "ready" ? (
+          <Link to={`/documents/${doc.id}/preview`} className="button">
+            View Content
+          </Link>
+        ) : (
+          <span className="button disabled">View Content</span>
+        )}
         <a href={getOriginalUrl(doc.id)} className="button" download>
           Download Original
         </a>

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { deleteDocument, listDocuments, uploadDocument } from "../api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Pagination } from "../components/Pagination";
+import { StatusBadge } from "../components/StatusBadge";
 import { UploadDialog } from "../components/UploadDialog";
 
 const PAGE_SIZE = 20;
@@ -17,6 +18,10 @@ export function DocumentListPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["documents", offset],
     queryFn: () => listDocuments(PAGE_SIZE, offset),
+    refetchInterval: (query) => {
+      const items = query.state.data?.items;
+      return items?.some((d) => d.status === "processing") ? 2000 : false;
+    },
   });
 
   const uploadMutation = useMutation({
@@ -66,6 +71,7 @@ export function DocumentListPage() {
           <thead>
             <tr>
               <th>Filename</th>
+              <th>Status</th>
               <th>Type</th>
               <th>Size</th>
               <th>Created</th>
@@ -78,6 +84,7 @@ export function DocumentListPage() {
                 <td>
                   <Link to={`/documents/${doc.id}`}>{doc.filename}</Link>
                 </td>
+                <td><StatusBadge status={doc.status} /></td>
                 <td>{doc.content_type}</td>
                 <td>{formatSize(doc.size_bytes)}</td>
                 <td>{formatDate(doc.created_at)}</td>

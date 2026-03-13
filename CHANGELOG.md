@@ -7,6 +7,10 @@
 - Content and outline endpoints return 409 while document is still processing.
 - Markdown files (`.md`) skip conversion and are ready immediately.
 - MCP tools return descriptive messages when content is not yet available.
+- Frontend: show status badge in document list and detail pages.
+- Frontend: auto-poll while documents are processing.
+- Frontend: disable "View Content" link until document is ready.
+- Frontend: preview page retries automatically on 409 while processing.
 
 ## 0.3.0
 
