@@ -7,4 +7,5 @@
 - [Frontend Architecture](frontend-architecture.md) — React SPA design, tech decisions, project structure
 - [Running](running.md) — Backend & frontend startup, configuration, Claude Code MCP setup
 - [Releasing](releasing.md) — Docker images, CI workflow, Makefile targets, deployment
+- [Dependencies](dependencies.md) — Docling integration, OpenCV headless override, OCR engines
 - [MCP Example Config](mcp-example.json) — Example `.mcp.json` for third-party projects

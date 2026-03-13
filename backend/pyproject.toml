@@ -1,6 +1,6 @@
 [project]
 name = "docfabric"
-version = "0.2.1"
+version = "0.2.2"
 description = "Document infrastructure layer for AI-optimized access"
 requires-python = ">=3.12"
 dependencies = [
@@ -23,6 +23,10 @@ dev = [
     "httpx",
     "fastmcp",
 ]
+
+[tool.uv]
+override-dependencies = ["opencv-python-headless>=4"]
+constraint-dependencies = ["opencv-python<0"]
 
 [build-system]
 requires = ["hatchling"]
