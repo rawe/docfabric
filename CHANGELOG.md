@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Async document processing: uploads return immediately with a document ID; markdown conversion runs in the background.
+- Add `status` field to document metadata (`processing`, `ready`, `error`).
+- Content and outline endpoints return 409 while document is still processing.
+- Markdown files (`.md`) skip conversion and are ready immediately.
+- MCP tools return descriptive messages when content is not yet available.
+
 ## 0.3.0
 
 - Add `GET /api/documents/{id}/outline` REST endpoint for document heading structure.
