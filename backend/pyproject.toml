@@ -1,6 +1,6 @@
 [project]
 name = "docfabric"
-version = "0.2.2"
+version = "0.3.0"
 description = "Document infrastructure layer for AI-optimized access"
 requires-python = ">=3.12"
 dependencies = [

@@ -37,6 +37,7 @@ class OutlineMode(str, Enum):
 class OutlineSection(BaseModel):
     level: int
     title: str
+    heading_path: str
     offset: int
     length: int
 

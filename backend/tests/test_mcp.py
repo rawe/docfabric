@@ -219,7 +219,7 @@ class TestGetDocumentOutline:
         assert data["total_length"] == len(_OUTLINE_MD)
 
         for s in sections:
-            assert set(s.keys()) == {"level", "title", "offset", "length"}
+            assert set(s.keys()) == {"level", "title", "heading_path", "offset", "length"}
 
         assert sections[0]["title"] == "Introduction"
         assert sections[0]["level"] == 1

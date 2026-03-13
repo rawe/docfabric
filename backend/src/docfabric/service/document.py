@@ -162,7 +162,12 @@ class DocumentService:
         ]
 
         sections = []
+        path_stack: list[tuple[int, str]] = []
         for i, (start, level, title) in enumerate(headings):
+            path_stack = [(l, t) for l, t in path_stack if l < level]
+            path_stack.append((level, title))
+            heading_path = " > ".join(t for _, t in path_stack)
+
             if mode is OutlineMode.nested:
                 end = total
                 for future_start, future_level, _ in headings[i + 1 :]:
@@ -175,7 +180,10 @@ class DocumentService:
                 else:
                     end = total
             sections.append(
-                OutlineSection(level=level, title=title, offset=start, length=end - start)
+                OutlineSection(
+                    level=level, title=title, heading_path=heading_path,
+                    offset=start, length=end - start,
+                )
             )
 
         return DocumentOutline(sections=sections, total_length=total)

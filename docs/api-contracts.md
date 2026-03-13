@@ -110,8 +110,8 @@ Get document outline (heading structure).
   ```json
   {
     "sections": [
-      { "level": 1, "title": "Introduction", "offset": 0, "length": 32 },
-      { "level": 2, "title": "Background",   "offset": 32, "length": 25 }
+      { "level": 1, "title": "Introduction", "heading_path": "Introduction", "offset": 0, "length": 32 },
+      { "level": 2, "title": "Background",   "heading_path": "Introduction > Background", "offset": 32, "length": 25 }
     ],
     "total_length": 57
   }
@@ -144,7 +144,7 @@ Read-only access. Four tools:
 - **Parameters:**
   - `document_id` (str, required)
   - `mode` (str, optional, default `flat`) — `flat` or `nested`
-- **Returns:** Flat list of heading sections with `level`, `title`, `offset`, `length`, plus `total_length`. The `offset` and `length` values map directly to `read_document_content` parameters, enabling precise section retrieval without reading the entire document.
+- **Returns:** Flat list of heading sections with `level`, `title`, `heading_path`, `offset`, `length`, plus `total_length`. The `offset` and `length` values map directly to `read_document_content` parameters, enabling precise section retrieval without reading the entire document.
   - `flat` (default): each section's `length` covers only its own text. Non-overlapping — suitable for sequential document processing.
   - `nested`: each section's `length` includes sub-headings. Parent ranges overlap with children — suitable for retrieving a full section with all its descendants.
 - **Rationale:** Lets an LLM navigate large documents structurally — scan headings first, then read only the relevant section.

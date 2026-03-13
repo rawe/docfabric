@@ -303,3 +303,12 @@ class TestGetOutline:
         # H1 has only its heading line
         assert h1.title == "Part One"
         assert h1.length == len("# Part One\n")
+
+    async def test_heading_path(self, service: DocumentService):
+        doc_id = await _create_doc_with_markdown(service, _OUTLINE_MD)
+        outline = await service.get_outline(doc_id)
+
+        assert outline.sections[0].heading_path == "Introduction"
+        assert outline.sections[1].heading_path == "Introduction > Background"
+        assert outline.sections[2].heading_path == "Introduction > Background > Details"
+        assert outline.sections[3].heading_path == "Introduction > Methods"
